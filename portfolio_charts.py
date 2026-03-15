@@ -420,7 +420,7 @@ def _render_tab_performance(
 
     # ベンチマーク
     if benchmark != "なし":
-        bench_returns = df_filtered[benchmark].pct_change().dropna()
+        bench_returns = df_filtered[benchmark].pct_change(fill_method=None).dropna()
         # iloc[-n:] でポートフォリオと期間を合わせ、indexを直接x軸に使用
         # (dropna後のindexをそのまま使うことで欠損値による日付ずれを防止)
         bench_slice = bench_returns.iloc[-len(port_returns):]
@@ -1006,7 +1006,7 @@ def _render_tab_constituents(
                 )
 
                 # リターン計算
-                fund_returns_full = fund_prices_full.pct_change().dropna()
+                fund_returns_full = fund_prices_full.pct_change(fill_method=None).dropna()
 
                 # リターン表作成
                 periods_dict = {
@@ -1025,7 +1025,7 @@ def _render_tab_constituents(
                     fund_ret = calc_annualized_return(fund_returns_full, period_months)
 
                     if benchmark != "なし":
-                        bench_returns_full = bench_prices_full.pct_change().dropna()
+                        bench_returns_full = bench_prices_full.pct_change(fill_method=None).dropna()
                         bench_ret = calc_annualized_return(bench_returns_full, period_months)
                     else:
                         bench_ret = np.nan
@@ -1040,16 +1040,23 @@ def _render_tab_constituents(
                 # 定量分析計算（calculate_fund_metrics は portfolio_utils で一元管理）
                 _rf = analyzer.risk_free_rate if analyzer is not None else 0.0
                 if benchmark != "なし":
-                    bench_returns_full = bench_prices_full.pct_change().dropna()
+                    bench_returns_full = bench_prices_full.pct_change(fill_method=None).dropna()
                     fund_metrics  = calculate_fund_metrics(fund_returns_full,  bench_returns_full, risk_free_rate=_rf)
                     bench_metrics = calculate_fund_metrics(bench_returns_full, risk_free_rate=_rf)
                 else:
                     fund_metrics  = calculate_fund_metrics(fund_returns_full, risk_free_rate=_rf)
+                    # [NEW-BUG-2修正] 改善G/H で追加した Omega/Ulcer/Martin/GL の4キーが
+                    # 欠落していた。bench_metrics.get(..., "-") は KeyError を起こさないが
+                    # ベンチマーク「なし」時のみ4指標列が常に "-" になっていた。
                     bench_metrics = {
-                        "シャープレシオ": "N/A", 
+                        "シャープレシオ": "N/A",
                         "価格変動リスク": "N/A",
-                        "最大下落率": "N/A",
-                        "相関性": "N/A"
+                        "最大下落率":     "N/A",
+                        "Omega比率":      "N/A",
+                        "Ulcer指数":      "N/A",
+                        "Martin比率":     "N/A",
+                        "GL比率":         "N/A",
+                        "相関性":         "N/A",
                     }
 
                 _bname = benchmark if benchmark != "なし" else "ベンチマーク"
