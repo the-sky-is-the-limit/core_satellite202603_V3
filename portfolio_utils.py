@@ -481,7 +481,12 @@ class PortfolioAnalyzer:
         raw_weights = []
         prev_w      = np.ones(n_assets) / n_assets
         w_equal     = np.ones(n_assets) / n_assets
-        cov_w_buf   = np.empty(n_assets)  # バッファ再利用（GC削減）
+        # 注意: cov_w_buf はループ全体で共有する単一のバッファ（GC削減のため）。
+        # jac クロージャは全て同じバッファを参照するが、SLSQP は逐次実行であり
+        # 各 jac 呼び出しが完了してから次の呼び出しが始まるため競合は発生しない。
+        # 将来的に並列実行（joblib 等）に変更する場合はスレッドローカルバッファに
+        # 変更すること（例: np.empty を呼び出し側に移動して各クロージャに閉じ込める）。
+        cov_w_buf   = np.empty(n_assets)  # バッファ再利用（GC削減・逐次実行前提）
 
         for lam in lambdas:
             def obj(w, l=lam):
@@ -693,10 +698,14 @@ class PortfolioAnalyzer:
                     w_proj[core_fund_idx] = np.clip(target_core, core_min, core_max)
                 else:
                     # コアでも調整不可能な場合は、可能な範囲で調整
-                    # （このケースは可行性チェックで事前に弾かれるはず）
+                    # （このケースは可行性チェックで事前に弾かれるはず。
+                    #   発生した場合は optimize_portfolio() の入口可行性チェックを確認すること）
                     warnings.warn(
-                        f"Unable to project to feasible simplex. Delta={delta:.6f}",
-                        RuntimeWarning, stacklevel=3
+                        f"Unable to project to feasible simplex: "
+                        f"delta={delta:.6f}, core_range=({core_min:.3f},{core_max:.3f}), "
+                        f"n_active={active.sum()}, min_ind={min_individual:.4f}. "
+                        f"Check feasibility condition at call site.",
+                        RuntimeWarning, stacklevel=2
                     )
         
         # 5. 最終的なboundsチェック（念のため）
@@ -759,10 +768,18 @@ class PortfolioAnalyzer:
                     # 3) 最終チェック
                     total4 = w_proj.sum()
                     if abs(total4 - 1.0) > 1e-6:
+                        # 制約違反のウェイトを無言で返すことを防ぐため、
+                        # 最終手段として比例正規化し、ウェイト詳細をログに残す。
+                        # （bounds 違反が残る可能性があるため stacklevel=2 で呼び出し元も示す）
+                        w_proj = w_proj / total4 if total4 > 0 else w_proj
                         warnings.warn(
-                            f"Post-clip renormalization failed. sum={total4:.8f}, "
-                            f"delta={1.0-total4:.8f}",
-                            RuntimeWarning, stacklevel=3
+                            f"Post-clip renormalization failed. "
+                            f"sum_before={total4:.8f}, delta={1.0-total4:.8f}. "
+                            f"Fallback: proportional rescaling applied. "
+                            f"core_w={w_proj[core_fund_idx]:.4f} "
+                            f"(range={core_min:.3f}–{core_max:.3f}). "
+                            f"Verify constraint satisfaction at call site.",
+                            RuntimeWarning, stacklevel=2
                         )
                 # --- 追加ここまで ---
         
@@ -919,7 +936,15 @@ class PortfolioAnalyzer:
         _all_active = np.ones(n_assets, dtype=bool)
 
         def _make_feasible(w_raw: np.ndarray) -> np.ndarray:
-            """ランダムウェイトを実行可能領域に射影（_project_to_feasible_simplex の薄いラッパー）"""
+            """ランダムウェイトを実行可能領域に射影（_project_to_feasible_simplex の薄いラッパー）。
+
+            min_individual に 0.0 を渡しているのは意図的な設計。
+            この関数は一次最適化のマルチスタート初期点を生成するためのものであり、
+            一次最適化の bounds は (0, max_individual) と設定している（min_individual 下限なし）。
+            min_individual 下限の適用は二次最適化（アクティブセット固定後）で行う。
+            ここを min_individual に書き換えると初期点が過度に制約され、
+            一次最適化の探索空間が狭まるため変更しないこと。
+            """
             return self._project_to_feasible_simplex(
                 w_raw, _all_active, core_fund_idx,
                 core_weight_range, 0.0, max_individual,
@@ -1094,9 +1119,10 @@ class FundScreener:
     # 設計上の注意:
     #   - screen_funds() は statistics に列を追加するが、キャッシュ本体は
     #     .copy() で保護しているため 3 回目以降のインスタンスに汚染しない。
-    #   - テスト環境ではプロセスをまたいで再利用されないため LRU 制限は不要。
-    #     長時間プロセスで使う場合は maxsize 管理を将来検討する。
+    #   - _CACHE_MAX_SIZE を超えた場合は最も古いエントリを自動削除する（LRU 近似）。
+    #     Streamlit のサーバー常時起動環境で数百エントリが蓄積し続けることを防ぐ。
     _statistics_cache: Dict[str, "pd.DataFrame"] = {}
+    _CACHE_MAX_SIZE: int = 32  # エントリ上限（32 × ~2MB = 最大約 64MB が目安）
 
     # キャッシュファンド検出用の最低ボラティリティ閾値（年率）
     # 3%を選択した理由:
@@ -1134,6 +1160,10 @@ class FundScreener:
         else:
             # キャッシュミス: 新規計算してキャッシュに格納
             self.statistics = self._calculate_statistics()
+            # サイズ上限を超えた場合は最も古いエントリを削除（挿入順辞書の先頭 = 最古）
+            if len(FundScreener._statistics_cache) >= FundScreener._CACHE_MAX_SIZE:
+                oldest_key = next(iter(FundScreener._statistics_cache))
+                del FundScreener._statistics_cache[oldest_key]
             FundScreener._statistics_cache[_cache_key] = self.statistics.copy()
             self._stats_cache_hit = False
 
@@ -1455,13 +1485,18 @@ class FundScreener:
 
     # デフォルトのバケット別割当枠（コアを除く n_final-1 本の配分比率）
     # キーはバケット名、値は割当の「重み」（実際の本数は n_final に応じてスケール）
+    #
+    # 合計値 19 は「n_final=20 本構成」を基準とした参照値。
+    # アプリのサイドバーデフォルトは n_final=30 のため、実際には screen_funds() 内で
+    # スケール計算（scale = (n_final-1) / 19）が自動適用される（bucket_quota=None 時）。
+    # n_final を変更する場合でも、比率（2:3:5:5:4）は維持されたまま本数のみ変わる。
     _DEFAULT_BUCKET_QUOTA: Dict[str, int] = {
         'マイナス相関': 2,
         '低相関':       3,
         '中低相関':     5,
         '中高相関':     5,
         '高相関':       4,
-    }  # 合計 19 = n_final(20) - 1(コア)
+    }  # 合計 19（n_final=20 基準）。n_final 変更時は screen_funds() が自動スケール
 
     def screen_funds(self,
                      core_fund: str,
@@ -1845,7 +1880,9 @@ def calculate_fund_metrics(
     -------
     dict
         表示用整形済み文字列を値とする辞書。
-        データが 12 本未満の場合はすべての値が np.nan（未整形）で返る。
+        データが 12 本未満の場合もすべての値が "—" 文字列で返る（[ISSUE-1修正]）。
+        旧実装は np.nan（float）を返していたが、正常時の整形済み文字列と型が
+        まちまちになるため統一した。呼び出し元で型判定は不要。
 
     Notes
     -----
