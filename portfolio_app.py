@@ -1576,6 +1576,25 @@ if uploaded_file is not None:
             except Exception as _e:
                 st.error(f"ポートフォリオデータの取得に失敗: {_e}")
 
+            # ── 📊 構成ファンド 個別分析（このプロファイルタブに連動）──
+            # render_profile_detail の直後・同一タブ内に配置することで、
+            # 外側タブ切替と構成ファンド表示を完全に連動させる。
+            # Streamlit タブには選択コールバックがないため、
+            # タブの外に1回だけ呼ぶ方式では連動できない。
+            render_fund_drill_section(
+                portfolios       = portfolios,
+                selected_funds   = selected_funds,
+                returns_selected = returns_selected,
+                core_fund        = core_fund,
+                core_idx         = core_idx,
+                df_filtered      = df_filtered,
+                fund_stats       = fund_stats,
+                period_start     = _period_start,
+                period_end       = _period_end,
+                period_months    = _period_months,
+                profile_name     = _profile_name,   # タブ名を直接指定
+            )
+
     # リスクパリティ & テールリスク最小型のタブ描画（チェックON時のみ）
     for _outer_tab, (_ep_name, _ep_w, _ep_st) in zip(
         _outer_tabs[len(available_profiles):], _extra_profiles
@@ -1619,23 +1638,6 @@ if uploaded_file is not None:
                 )
             except Exception as _e:
                 st.error(f"{_ep_name}の詳細分析に失敗: {_e}")
-
-    # ─── 📊 構成ファンド 個別分析セクション ───────────────────────
-    # 比較サマリーで選択中のプロファイルの構成ファンドをファンド単位で表示。
-    # session_state["selected_card_profile"] と連動し、
-    # プロファイル切替時に自動的に表示ファンドが更新される。
-    render_fund_drill_section(
-        portfolios       = portfolios,
-        selected_funds   = selected_funds,
-        returns_selected = returns_selected,
-        core_fund        = core_fund,
-        core_idx         = core_idx,
-        df_filtered      = df_filtered,
-        fund_stats       = fund_stats,
-        period_start     = _period_start,
-        period_end       = _period_end,
-        period_months    = _period_months,
-    )
 
     # ─── エクスポート機能 ─────────────────────────────────────────
     # （render_export_section は portfolio_report で管理）
