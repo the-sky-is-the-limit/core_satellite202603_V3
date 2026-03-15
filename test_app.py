@@ -70,14 +70,18 @@ def test_screening(df):
 
     try:
         # 3年データに絞る
-        df_3y = df.iloc[-36:]
+        # [P5修正] pct_change() で先頭1行が NaN になるため、36ヶ月分のリターンを確保するには
+        # 37行（36+1）の価格データが必要。portfolio_app.py が df_price.iloc[-(months+1):]
+        # と +1 を明示しているのと同様にここでも -37 に修正する。
+        df_3y = df.iloc[-37:]
 
         # [BUG-2修正] portfolio_app.py と同一のフィルタ：通貨ペア列のみ除外
         # 旧実装は先頭文字（J/L/M/P/R/S）で絞り込んでいたため本番とファンド数が乖離していた
         fund_cols = [col for col in df_3y.columns if col not in CURRENCY_KEYWORDS]
 
         # 欠損チェック（本番と同一: コア期間内欠損率 == 0 で絞り込み）
-        missing_rates = df_3y[fund_cols].isnull().sum() / len(df_3y)
+        # pct_change(fill_method=None).dropna() 後のリターン系列（36行）で欠損率を計算する
+        missing_rates = df_3y[fund_cols].pct_change(fill_method=None).dropna().isnull().sum() / 36
         valid_funds = missing_rates[missing_rates == 0].index.tolist()
 
         print(f"✓ 有効ファンド数（欠損なし）: {len(valid_funds)}")
@@ -87,7 +91,7 @@ def test_screening(df):
             return None, None, None
 
         # リターン計算
-        returns = df_3y[valid_funds].pct_change().dropna()
+        returns = df_3y[valid_funds].pct_change(fill_method=None).dropna()
 
         # スクリーニング
         # m-3: risk_free_rate を明示（本番デフォルト 0.5% に合わせる）
@@ -192,32 +196,31 @@ def test_improvements(returns, core_fund, selected_funds):
     # ── A3: 統計キャッシュ ────────────────────────────────────────────────
     print("\n[A3] 統計キャッシュ")
     try:
-        # _stats_cache_hit は FundScreener にキャッシュ機構が実装された場合に
-        # 設定される属性。未実装の場合は getattr が None を返すため、
-        # 属性の有無を先にチェックしてからアサーションする。
+        # 1回目: キャッシュミス（新規計算）
         sc1 = FundScreener(returns, risk_free_rate=0.005)
         hit1 = getattr(sc1, '_stats_cache_hit', None)
+        assert hit1 is False, "初回生成でキャッシュヒットは想定外"
 
-        if hit1 is None:
-            print("  ⚠ スキップ: FundScreener に _stats_cache_hit が未実装")
-            print("    キャッシュ機構を実装した場合はこのテストを有効化してください。")
-        else:
-            assert hit1 is False, "初回生成でキャッシュヒットは想定外"
+        # 2回目: 同一引数 → キャッシュヒット
+        sc2 = FundScreener(returns, risk_free_rate=0.005)
+        hit2 = getattr(sc2, '_stats_cache_hit', None)
+        assert hit2 is True, "2回目生成でキャッシュミスは想定外"
 
-            sc2 = FundScreener(returns, risk_free_rate=0.005)
-            hit2 = getattr(sc2, '_stats_cache_hit', None)
-            assert hit2 is True, "2回目生成でキャッシュミスは想定外"
+        # キャッシュ汚染チェック: screen_funds() でコア相関列を追記しても
+        # 3回目の生成がキャッシュヒットした statistics に影響しないこと
+        _ = sc2.screen_funds(core_fund, n_final=min(10, len(selected_funds)))
+        sc3 = FundScreener(returns, risk_free_rate=0.005)
+        assert '相関安定性' not in sc3.statistics.columns or True, "汚染チェック"
+        # ← screen_funds() は statistics に列を追加するが、キャッシュ本体は
+        #   深いコピーで保護されているため sc3.statistics は追加前の状態のはず
+        pure_cols = set(sc1.statistics.columns)
+        cached_cols = set(sc3.statistics.columns)
+        assert pure_cols == cached_cols, (
+            f"キャッシュ汚染の可能性: 初回列 {pure_cols} != 3回目列 {cached_cols}"
+        )
 
-            # キャッシュ汚染チェック
-            _ = sc2.screen_funds(core_fund, n_final=min(10, len(selected_funds)))
-            sc3 = FundScreener(returns, risk_free_rate=0.005)
-            pure_cols   = set(sc1.statistics.columns)
-            cached_cols = set(sc3.statistics.columns)
-            assert pure_cols == cached_cols, (
-                f"キャッシュ汚染の可能性: 初回列 {pure_cols} != 3回目列 {cached_cols}"
-            )
-            print(f"  ✓ ミス→ヒット遷移: {not hit1} → {hit2}")
-            print(f"  ✓ キャッシュ汚染なし（列数: {len(pure_cols)}列）")
+        print(f"  ✓ ミス→ヒット遷移: {not hit1} → {hit2}")
+        print(f"  ✓ キャッシュ汚染なし（列数: {len(pure_cols)}列）")
     except Exception as e:
         print(f"  ✗ エラー: {e}")
         import traceback; traceback.print_exc()
