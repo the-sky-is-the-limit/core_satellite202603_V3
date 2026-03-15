@@ -17,6 +17,7 @@ from portfolio_data import (
     prep_overview_df,
     make_overview_col_config,
     style_overview_table,
+    CURRENCY_KEYWORDS,  # M-2: 通貨列フィルタは portfolio_data で一元管理
 )
 from portfolio_report import (
     build_report_data,
@@ -698,9 +699,10 @@ if uploaded_file is not None:
         st.stop()
     
     # 通貨列を除外（それ以外は全てファンド候補として扱う）
-    currency_keywords = ['USD-JPY', 'EUR-JPY', 'GBP-JPY', 'CHF-JPY', 'AUD-JPY']
+    # M-2: ローカル定義を廃止。portfolio_data.CURRENCY_KEYWORDS を参照することで
+    #      test_app.py との定義乖離リスクを解消する。
     fund_cols = [col for col in df_price.columns 
-                 if not any(curr in col for curr in currency_keywords)]
+                 if not any(curr in col for curr in CURRENCY_KEYWORDS)]
     
     st.markdown(
         f'<div style="background:linear-gradient(135deg,#ecfdf5,#d1fae5);border:1px solid #6ee7b7;'
@@ -1202,7 +1204,11 @@ if uploaded_file is not None:
     # selected_funds はスクリーニングで有効データが確認済みのため、
     # ここで dropna しても periods_months は months と一致するはず
     returns_selected = df_returns[selected_funds].dropna()
-    analyzer = PortfolioAnalyzer(returns_selected, use_ledoit_wolf=_use_lw)
+    # M-1: risk_free_rate を渡すことで LW インフォバーのシャープレシオを
+    #      FundScreener・optimize_portfolios と同一基準に統一する
+    analyzer = PortfolioAnalyzer(
+        returns_selected, risk_free_rate=rf_rate, use_ledoit_wolf=_use_lw
+    )
     
     # 最適化設定（各プロファイルで明確に異なる特性）
     optimization_configs = {
@@ -1266,7 +1272,8 @@ if uploaded_file is not None:
     # 最適化関数（キャッシュ付き）
     @st.cache_data(show_spinner=False)
     def optimize_portfolios(_returns_selected, selected_funds_tuple, core_fund_name,
-                            configs_key, _configs_dict, use_lw: bool = True):
+                            configs_key, _configs_dict,
+                            use_lw: bool = True, rf_rate: float = 0.0):
         """
         各リスクプロファイルのポートフォリオを最適化
 
@@ -1282,17 +1289,23 @@ if uploaded_file is not None:
             O-05 修正：_configs_dict はアンダースコアプレフィックスのため st.cache_data が
             ハッシュ化しない。最適化設定の変化を検知するため、設定を文字列化したキーを
             別引数として渡し、確実にキャッシュを無効化する。
+            M-1: rf_rate もキーに含まれているため、金利変更時は確実に再計算される。
         _configs_dict : dict
             プロファイル別の最適化設定
         use_lw : bool
             Ledoit-Wolf収縮共分散推定量を使用するか（キャッシュキーに含まれる）
+        rf_rate : float
+            年率無リスク金利（M-1: FundScreener と同一値を渡すことでシャープレシオを統一）
 
         Returns:
         --------
         dict : プロファイル別のポートフォリオ
         """
         # 関数内でAnalyzerを作成（キャッシュ安定性のため）
-        _analyzer = PortfolioAnalyzer(_returns_selected, use_ledoit_wolf=use_lw)
+        # M-1: risk_free_rate を渡し、シャープレシオ計算基準を FundScreener と統一する
+        _analyzer = PortfolioAnalyzer(
+            _returns_selected, risk_free_rate=rf_rate, use_ledoit_wolf=use_lw
+        )
         
         # タプルをリストに戻す
         _selected_funds = list(selected_funds_tuple)
@@ -1354,6 +1367,7 @@ if uploaded_file is not None:
                 _configs_cache_key,
                 optimization_configs,
                 use_lw=_use_lw,
+                rf_rate=rf_rate,   # M-1: FundScreener と同一の無リスク金利を渡す
             )
         except Exception as _opt_err:
             # Section 5: エラー種別「最適化収束失敗」
