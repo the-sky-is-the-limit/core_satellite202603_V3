@@ -607,7 +607,7 @@ def _render_tab_allocation(
 def _render_tab_risk(
     selected_profile, selected_weights, selected_stats,
     df_filtered, port_returns, port_cum_returns,
-    analyzer=None,
+    rf_rate=0.0,
 ):
     """Tab3：リスク分析（ドローダウン・ローリングボラ・ローリングシャープ）。"""
     st.markdown(f"### {selected_profile} - リスク分析")
@@ -708,7 +708,7 @@ def _render_tab_risk(
 
     with col1:
         # ローリングシャープ（月次リスクフリーレート控除、portfolio_utilsと定義を統一）
-        rfr_monthly = (analyzer.risk_free_rate if analyzer is not None else 0.0) / 12
+        rfr_monthly = rf_rate / 12
         rolling_sharpe = port_returns_series.rolling(window=12, min_periods=12).apply(
             lambda x: ((x.mean() - rfr_monthly) * 12) / (x.std() * np.sqrt(12)) if x.std() > 0 else 0
         )
@@ -922,7 +922,7 @@ def _render_tab_montecarlo(
 def _render_tab_constituents(
     selected_profile, selected_weights, selected_funds,
     df_price, benchmark, period_months,
-    analyzer=None,
+    rf_rate=0.0,
 ):
     """Tab6：構成銘柄詳細分析（全期間データ使用・calculate_fund_metrics で統一）。"""
     st.markdown("### 構成銘柄詳細分析")
@@ -1038,7 +1038,7 @@ def _render_tab_constituents(
                     })
 
                 # 定量分析計算（calculate_fund_metrics は portfolio_utils で一元管理）
-                _rf = analyzer.risk_free_rate if analyzer is not None else 0.0
+                _rf = rf_rate
                 if benchmark != "なし":
                     bench_returns_full = bench_prices_full.pct_change(fill_method=None).dropna()
                     fund_metrics  = calculate_fund_metrics(fund_returns_full,  bench_returns_full, risk_free_rate=_rf)
@@ -1688,14 +1688,30 @@ def render_profile_detail(
     df_price, benchmark, core_fund, core_idx,
     fund_stats, df_returns, portfolios,
     period_start, period_end, period_months,
-    analyzer=None
+    analyzer=None,
+    rf_rate=0.0,
 ):
     """プロファイル別詳細描画のオーケストレーター。
 
     ステージ3リファクタ（2026-03）で巨大な1関数を責務別サブ関数に分割。
     本関数はモード切替UI・共有変数計算・タブ定義のみを担い、
     各タブの描画は _render_tab_*() / _render_client_view() に委譲する。
+
+    Parameters
+    ----------
+    analyzer : PortfolioAnalyzer | None
+        後方互換のため残存。rf_rate が優先される。
+        両方指定された場合は rf_rate を使用する。
+    rf_rate : float
+        年率無リスク金利（ローリングシャープ・構成銘柄定量分析に使用）。
+        analyzer が渡された場合は analyzer.risk_free_rate で上書きする。
     """
+    # analyzer が渡された場合は risk_free_rate を取り出して rf_rate に反映
+    # （後方互換: 旧コードが analyzer= で呼ぶ場合に rf_rate が 0.0 のまま
+    #   になることを防ぐ）
+    if analyzer is not None:
+        rf_rate = getattr(analyzer, 'risk_free_rate', rf_rate)
+
     # ── 共有変数計算（全タブ共通） ────────────────────────────
     port_returns      = returns_selected.values @ selected_weights
     port_cum_returns  = (1 + port_returns).cumprod()
@@ -1779,7 +1795,7 @@ def render_profile_detail(
             _render_tab_risk(
                 selected_profile, selected_weights, selected_stats,
                 df_filtered, port_returns, port_cum_returns,
-                analyzer=analyzer,
+                rf_rate=rf_rate,
             )
 
     # tab4〜6 は is not None ガード（元の構造を維持）
@@ -1800,5 +1816,5 @@ def render_profile_detail(
             _render_tab_constituents(
                 selected_profile, selected_weights, selected_funds,
                 df_price, benchmark, period_months,
-                analyzer=analyzer,
+                rf_rate=rf_rate,
             )
