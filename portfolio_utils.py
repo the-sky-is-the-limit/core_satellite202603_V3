@@ -1740,8 +1740,17 @@ def export_results_to_excel(portfolios: Dict,
                             selected_funds: List[str],
                             output_path: str):
     """
-    分析結果をExcelにエクスポート
-    
+    分析結果をExcelにエクスポート（ファイルパス版）
+
+    .. deprecated::
+        本関数はファイルパス（str）を受け取る設計であり、Streamlit の
+        ダウンロードボタンが必要とする io.BytesIO とは互換性がない。
+        実際のエクスポート処理は portfolio_report.render_export_section() が
+        io.BytesIO を用いて直接実装しているため、この関数は現在呼び出されていない
+        （m-2 確認済みデッドコード）。
+        バッチ処理・テスト用途として残存させるが、
+        将来的には render_export_section 側に統合予定。
+
     Parameters:
     -----------
     portfolios : Dict
