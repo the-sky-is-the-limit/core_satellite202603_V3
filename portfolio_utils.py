@@ -373,110 +373,93 @@ class PortfolioAnalyzer:
     
     def calculate_efficient_frontier(self, n_points: int = 35) -> pd.DataFrame:
         """
-        効率的フロンティアを計算（v3.3.2 CAGR軸統一修正版）
+        効率的フロンティアを計算（v3.3.3 λスイープ法）
 
         Parameters:
         -----------
         n_points : int
-            計算ポイント数（デフォルト35）
+            出力点数の目安（重複排除後は下回る場合あり。デフォルト35）
 
         Notes:
         ------
-        【旧実装の問題と修正内容】
+        【v3.3.2（ボラスイープ型）の残存問題と修正内容】
 
-        旧実装（v3.3.1）は「目標μ固定 → ボラ最小化」（Markowitz型）で
-        フロンティアを生成していた。これには以下の2つの問題があった。
+        v3.3.2 で採用した「ボラ固定(vol ≤ target) → μ最大化」には
+        以下の構造的問題があった。
 
-        [バグ①] 最適化方向とY軸の不整合
-            Y軸は実現CAGR（時系列ベース）だが、
-            「μ最大化ポートフォリオ」≠「CAGR最大化ポートフォリオ」。
-            積極型など max_cagr 目的関数で最適化した制約付きポートフォリオが
-            フロンティアの上方に描画されてしまっていた。
-            修正：「ボラ水準固定 → リターン最大化」（ボラスイープ型）に変更。
-            これにより「同一ボラでの算術平均リターン上限 = CAGR上限」が保証される。
+        [バグ残存] 不等号制約の非拘束化による人工的天井
+            target_vol が十分大きい右端では vol ≤ target の制約が非拘束となり、
+            オプティマイザーが vol に関係なくリターンのみを最大化する。
+            その結果、複数の target_vol が同一の「最高リターン単一資産」に
+            収束し、フロンティアが人工的に高い「天井」に張り付く。
+            → グラフ上でフロンティアが vol≈8% で急騰して平坦になる現象の原因。
 
-        [バグ②] X軸の計算方法の不一致
-            旧実装はLW収縮共分散でボラを計算していたが、
-            個別ファンドの散布図は時系列std（サンプル共分散ベース）を使用。
-            LW収縮で分散ポートフォリオのボラが過小評価され、軸が乖離していた。
-            修正：フロンティア計算にサンプル共分散を使用し軸を統一。
+        【v3.3.3 の修正：λスイープ法（平均分散ユーティリティ）】
 
-        修正後の一貫性：
-            個別ファンド散布X = std×√12（サンプル）
-            各プロファイル散布X = port_r.std()×√12（時系列std、portfolio_report.pyで変更済み）
-            フロンティアX = √(w^T Σ_sample w) ≈ 時系列std（サンプル共分散）
+        `maximize μ(w) - λ・σ²(w)` の λ を対数スケールで変化させて
+        フロンティア全体を自然に描く。
+
+        利点:
+          ・等号/不等号の vol 制約を一切使わないため非拘束化の問題がない
+          ・λ→∞ で最小分散ポートフォリオ（左端）
+          ・λ→0  で最大リターンポートフォリオ（右端）
+          ・凸最適化問題として解析的に解けるため収束が安定
+
+        X軸/Y軸の一貫性（v3.3.2 から継承）:
+          フロンティアX = √(w^T Σ_sample w)（サンプル共分散）
+          個別ファンドX = 時系列 std × √12（= サンプル共分散と同値）
+          各プロファイルX = 時系列 std × √12（portfolio_report.py 側で変換済み）
+          フロンティアY・プロファイルY = 実現CAGR（時系列ベース、同定義）
         """
-        # ── サンプル共分散（フロンティア表示専用）────────────────────────────
-        # LW共分散は最適化安定性のために使うが、フロンティア表示では
-        # 個別ファンド散布図（時系列std）との軸一貫性のためサンプル共分散を使用する。
+        # ── サンプル共分散（フロンティア表示専用・X軸統一）─────────────────────
         sample_cov = self.returns.cov() * self.periods_per_year
 
         n_assets = len(self.mean_returns_arith)
         mu  = self.mean_returns_arith.values
         cov = sample_cov.values
-        bounds = tuple((0, 1) for _ in range(n_assets))
+        bounds      = tuple((0, 1) for _ in range(n_assets))
+        eq_sum1     = {'type': 'eq', 'fun': lambda w: np.sum(w) - 1.0}
 
         def _vol(w):
-            v = np.dot(w, np.dot(cov, w))
-            return np.sqrt(max(v, 0.0))
+            return np.sqrt(max(float(np.dot(w, np.dot(cov, w))), 0.0))
 
-        def _neg_ret(w):
-            return -np.dot(w, mu)
+        # ── Step 1: λスイープ用の λ 列を対数スケールで生成 ────────────────────
+        # λ 大（右辺係数が大きい）→ 分散ペナルティが強い → 低ボラポートフォリオ（左端）
+        # λ 小 → ほぼリターン最大化 → 高ボラポートフォリオ（右端）
+        # 対数スケールで n_points * 2 本取り、重複除去後に n_points 前後を確保する。
+        lambdas = np.unique(np.concatenate([
+            np.geomspace(1e-4,  0.1,  n_points // 3 + 2),
+            np.geomspace(0.1,   10.0, n_points // 3 + 4),
+            np.geomspace(10.0,  5000.0, n_points // 3 + 4),
+        ]))  # 小さい順（右端→左端）
 
-        # ── Step 1: 最小分散ポートフォリオ（フロンティアの左端）──────────────
-        mv_result = minimize(
-            _vol,
-            np.ones(n_assets) / n_assets,
-            method='SLSQP',
-            bounds=bounds,
-            constraints=[{'type': 'eq', 'fun': lambda w: np.sum(w) - 1}],
-            options={'maxiter': 400, 'ftol': 1e-8}
-        )
-        if mv_result.success:
-            vol_min   = _vol(mv_result.x)
-            w_min_var = mv_result.x.copy()
-        else:
-            w_min_var = np.ones(n_assets) / n_assets
-            vol_min   = _vol(w_min_var)
+        # ── Step 2: 各 λ で mean-variance utility を最大化 ───────────────────
+        raw_vols    = []
+        raw_rets    = []
+        raw_weights = []
+        prev_w      = np.ones(n_assets) / n_assets
+        w_equal     = np.ones(n_assets) / n_assets
 
-        # 右端：最高リターン単資産のボラ
-        max_ret_idx = int(np.argmax(mu))
-        w_max_ret   = np.zeros(n_assets)
-        w_max_ret[max_ret_idx] = 1.0
-        vol_max = _vol(w_max_ret)
-
-        # ── Step 2: ボラ水準を均等分割してスイープ ───────────────────────────
-        # 各ボラ水準で「最大算術平均リターン」を達成するポートフォリオを求める。
-        # 算術平均リターンの最大化 = 同一ボラでのCAGR最大化（σ固定なのでCAGR∝μ）。
-        # これによりフロンティアが散布図上の全ポートフォリオ点を上から正しく包む。
-        target_vols = np.linspace(vol_min, vol_max, n_points)
-
-        frontier_vols    = []
-        frontier_rets    = []
-        frontier_weights = []
-        prev_w           = w_min_var.copy()
-        w_equal          = np.ones(n_assets) / n_assets
-
-        for target_vol in target_vols:
-            constraints = [
-                {'type': 'eq',   'fun': lambda w: np.sum(w) - 1},
-                # vol ≤ target_vol（等号が最適解のため実質 vol = target_vol）
-                {'type': 'ineq', 'fun': lambda w, t=target_vol: t - _vol(w)},
-            ]
-            _opt_kw = dict(
-                method='SLSQP', bounds=bounds,
-                constraints=constraints,
-                options={'maxiter': 400, 'ftol': 1e-8},
-            )
+        for lam in lambdas:
+            def obj(w, l=lam):
+                # -(μ - λ σ²) を最小化 ≡ (μ - λ σ²) を最大化
+                ret = float(np.dot(w, mu))
+                var = float(np.dot(w, np.dot(cov, w)))
+                return -(ret - l * var)
 
             best_ret = -np.inf
             best_w   = None
 
             for w0 in [prev_w, w_equal]:
                 try:
-                    res = minimize(_neg_ret, w0, **_opt_kw)
-                    if res.success and _vol(res.x) <= target_vol + 1e-4:
-                        ret = -res.fun
+                    res = minimize(
+                        obj, w0, method='SLSQP',
+                        bounds=bounds,
+                        constraints=[eq_sum1],
+                        options={'maxiter': 400, 'ftol': 1e-8},
+                    )
+                    if res.success:
+                        ret = float(np.dot(res.x, mu))
                         if ret > best_ret:
                             best_ret = ret
                             best_w   = res.x.copy()
@@ -484,41 +467,51 @@ class PortfolioAnalyzer:
                     pass
 
             if best_w is not None:
-                frontier_vols.append(_vol(best_w))
-                frontier_rets.append(best_ret)
-                frontier_weights.append(best_w.copy())
+                raw_vols.append(_vol(best_w))
+                raw_rets.append(best_ret)
+                raw_weights.append(best_w.copy())
                 prev_w = best_w.copy()
-            else:
-                frontier_vols.append(target_vol)
-                frontier_rets.append(np.nan)
-                frontier_weights.append(None)
 
-        # ── Step 3: vol昇順にソートし、リターンNaNを線形補完 ──────────────────
-        vols_arr = np.array(frontier_vols, dtype=float)
-        rets_arr = np.array(frontier_rets, dtype=float)
+        if len(raw_vols) < 2:
+            # 収束失敗フォールバック：均等配分の単点を返す
+            w_fb  = np.ones(n_assets) / n_assets
+            port_r = self.returns.values @ w_fb
+            cum_r  = (1 + port_r).prod() - 1
+            cagr   = (1 + cum_r) ** (self.periods_per_year / len(port_r)) - 1
+            return pd.DataFrame({
+                'リターン':      [float(np.dot(w_fb, mu))],
+                'リターン_CAGR': [cagr],
+                'ボラティリティ': [_vol(w_fb)],
+            })
 
-        sort_idx = np.argsort(vols_arr)
-        vols_arr = vols_arr[sort_idx]
-        rets_arr = rets_arr[sort_idx]
-        frontier_weights = [frontier_weights[i] for i in sort_idx]
+        # ── Step 3: vol 昇順ソート → 支配された点を除去 ────────────────────────
+        # 「より低いvolでより高いリターンを達成できる点」は非効率（下方フロンティア）。
+        # このような点を除去し、真の上方フロンティアだけを残す。
+        sort_idx    = np.argsort(raw_vols)
+        vols_s      = np.array(raw_vols)[sort_idx]
+        rets_s      = np.array(raw_rets)[sort_idx]
+        weights_s   = [raw_weights[i] for i in sort_idx]
 
-        valid = ~np.isnan(rets_arr)
-        if valid.sum() >= 2:
-            nan_idx   = np.where(~valid)[0]
-            valid_idx = np.where(valid)[0]
-            rets_arr[nan_idx] = np.interp(
-                vols_arr[nan_idx], vols_arr[valid_idx], rets_arr[valid_idx]
-            )
+        # 単調増加な ret のみ保持（低 vol 側の点が高い ret を持つ場合、その点は非効率）
+        keep        = [0]
+        max_ret_so_far = rets_s[0]
+        for i in range(1, len(rets_s)):
+            if rets_s[i] >= max_ret_so_far - 1e-6:
+                keep.append(i)
+                max_ret_so_far = max(max_ret_so_far, rets_s[i])
 
-        # ── Step 4: 実現CAGR（時系列ベース）を計算 ───────────────────────────
-        # 最適化中のμ（算術平均）ではなく実際の月次リターン系列から直接CAGRを求める。
-        # これにより散布図のY軸（ポートフォリオCAGR）と同一定義になる。
+        vols_arr    = vols_s[keep]
+        rets_arr    = rets_s[keep]
+        weights_arr = [weights_s[i] for i in keep]
+
+        # ── Step 4: 実現CAGR（時系列ベース）を計算 ────────────────────────────
+        # 最適化中のμ（算術平均）ではなく月次リターン系列から直接CAGRを求める。
+        # 散布図のY軸（ポートフォリオCAGR）と完全に同定義になる。
         realized_cagr = []
         ret_series_np = self.returns.values
-        for w_f in frontier_weights:
-            if w_f is None:
-                realized_cagr.append(np.nan)
-                continue
+        n_periods_data = len(ret_series_np)
+
+        for w_f in weights_arr:
             port_r = ret_series_np @ w_f
             n_pf   = len(port_r)
             if n_pf == 0:
@@ -533,9 +526,9 @@ class PortfolioAnalyzer:
         cagr_arr = np.array(realized_cagr, dtype=float)
 
         return pd.DataFrame({
-            'リターン':      rets_arr,    # 算術年率（最適化内部値）
-            'リターン_CAGR': cagr_arr,    # 実現CAGRベース（散布図Y軸と同定義）
-            'ボラティリティ': vols_arr,   # サンプル共分散ベース（散布図X軸と統一）
+            'リターン':      rets_arr,     # 算術年率（最適化内部値）
+            'リターン_CAGR': cagr_arr,     # 実現CAGRベース（散布図Y軸と同定義）
+            'ボラティリティ': vols_arr,    # サンプル共分散ベース（散布図X軸と統一）
         })
     
     def _project_to_feasible_simplex(self, 
