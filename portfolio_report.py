@@ -200,8 +200,8 @@ def render_report_panel(
 ):
     """統合レポートパネル（プロファイルカード＋3タブ）を描画する。"""
     # portfolio_app.py のサイドバー値をローカル変数にバインド
-    _show_rp     = show_rp
-    _use_lw      = use_lw
+    _show_rp    = show_rp
+    _use_lw     = use_lw
     if overview_raw is None:
         overview_raw = pd.DataFrame()
     # ─── プロファイルカード ───────────────────────────────────
@@ -997,8 +997,8 @@ def render_report_panel(
             bars_html += '</div>'
             st.markdown(bars_html, unsafe_allow_html=True)
 
-    # ── allocation_df_numeric を返す（render_export_section で使用）──
-    return allocation_df_numeric
+    # ── allocation_df_numeric と分析期間を返す ──────────────────
+    return allocation_df_numeric, _period_start, _period_end, _period_months
 
 
 def render_export_section(
