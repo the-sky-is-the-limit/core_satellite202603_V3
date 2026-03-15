@@ -1600,20 +1600,29 @@ def render_fund_drill_section(
     period_start,
     period_end,
     period_months,
+    profile_name: str = None,
 ):
     """📊 構成ファンド 個別分析セクション。
 
-    比較サマリーで選択されたプロファイル（session_state["selected_card_profile"]）
-    の構成ファンド（weight > 1%）をタブで表示する。
-    各タブは顧客向けリッチHTMLビュー（_render_fund_client_view）を使用。
+    Parameters
+    ----------
+    profile_name : str | None
+        表示対象プロファイル名を直接指定する（推奨）。
+        None のときは session_state["selected_card_profile"] にフォールバック。
 
-    portfolio_app.py から「プロファイル別 詳細分析」タブの直後に呼び出す。
+    portfolio_app.py の各プロファイル外側タブの内部（render_profile_detail の直後）
+    に呼び出すことで、外側タブの選択と構成ファンド表示を完全に連動させる。
     """
-    # ── 選択中プロファイルを取得 ──────────────────────────────
-    _sel_profile = st.session_state.get("selected_card_profile", "バランス型")
-
-    # portfolios に存在しない場合（RP・TR選択時など）はスキップ
+    # ── 表示プロファイルを決定 ────────────────────────────────
+    # profile_name が明示指定されていればそれを優先。
+    # 指定なしの場合のみ session_state を参照（後方互換のため残す）。
     _standard_5 = ["積極型", "やや積極型", "バランス型", "やや保守型", "保守型"]
+    if profile_name is not None:
+        _sel_profile = profile_name
+    else:
+        _sel_profile = st.session_state.get("selected_card_profile", "バランス型")
+
+    # 標準5プロファイル以外（RP・TR など）はスキップ
     if _sel_profile not in portfolios or _sel_profile not in _standard_5:
         return
 
@@ -1629,8 +1638,10 @@ def render_fund_drill_section(
     ]
     # コアを先頭に、残りは比率降順
     _core_entry  = [(f, w) for f, w in _constituent if f == core_fund]
-    _other_entry = sorted([(f, w) for f, w in _constituent if f != core_fund],
-                          key=lambda x: x[1], reverse=True)
+    _other_entry = sorted(
+        [(f, w) for f, w in _constituent if f != core_fund],
+        key=lambda x: x[1], reverse=True,
+    )
     _constituent = _core_entry + _other_entry
 
     if not _constituent:
@@ -1645,8 +1656,8 @@ def render_fund_drill_section(
     )
     st.markdown(
         '<p style="font-size:0.77rem;color:#64748b;margin:-4px 0 10px 0;line-height:1.6;">'
-        '選択プロファイルの構成ファンドをファンド単位で分析。'
-        '比較サマリーのプロファイルボタンと連動して表示ファンドが切り替わります。'
+        '上のプロファイルタブの切り替えに連動して表示ファンドが変わります。'
+        'コアファンドとの相関・リスク・リターンをファンド単位で確認できます。'
         '</p>',
         unsafe_allow_html=True,
     )
@@ -1663,16 +1674,16 @@ def render_fund_drill_section(
     for _tab, (_fn, _fw) in zip(_fund_tabs, _constituent):
         with _tab:
             _render_fund_client_view(
-                fund_name        = _fn,
-                fund_idx         = selected_funds.index(_fn),
+                fund_name         = _fn,
+                fund_idx          = selected_funds.index(_fn),
                 weight_in_profile = _fw * 100,
-                returns_selected = returns_selected,
-                core_fund        = core_fund,
-                df_filtered      = df_filtered,
-                period_start     = period_start,
-                period_end       = period_end,
-                period_months    = period_months,
-                profile_color    = _color,
+                returns_selected  = returns_selected,
+                core_fund         = core_fund,
+                df_filtered       = df_filtered,
+                period_start      = period_start,
+                period_end        = period_end,
+                period_months     = period_months,
+                profile_color     = _color,
             )
 
 
