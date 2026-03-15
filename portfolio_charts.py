@@ -1712,7 +1712,7 @@ def render_profile_detail(
     col_mode_l, col_mode_r = st.columns([6, 1])
     with col_mode_r:
         if st.session_state["view_mode"] == "client":
-            if st.button("⚙️ 担当者モード", key=f"mode_btn_{selected_profile}", use_container_width=True):
+            if st.button("担当者モード", key=f"mode_btn_{selected_profile}", use_container_width=True):
                 st.session_state["view_mode"] = "advisor"
                 st.rerun()
         else:
