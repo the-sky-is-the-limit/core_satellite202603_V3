@@ -1211,12 +1211,11 @@ if uploaded_file is not None:
     # selected_funds はスクリーニングで有効データが確認済みのため、
     # ここで dropna しても periods_months は months と一致するはず
     returns_selected = df_returns[selected_funds].dropna()
-    # M-1: risk_free_rate を渡すことで LW インフォバーのシャープレシオを
-    #      FundScreener・optimize_portfolios と同一基準に統一する
-    analyzer = PortfolioAnalyzer(
-        returns_selected, risk_free_rate=rf_rate, use_ledoit_wolf=_use_lw
-    )
-    
+    # [Fix ⑪] PortfolioAnalyzer は optimize_portfolios() 内でのみ生成する。
+    # 旧実装ではここで LW インフォバー表示用に analyzer を生成していたため、
+    # 初回実行時に LedoitWolf.fit() が二重実行されていた。
+    # LW メタデータは optimize_portfolios() の戻り値 _lw_meta から取得する。
+
     # 最適化設定（各プロファイルで明確に異なる特性）
     optimization_configs = {
         "積極型": {
@@ -1367,8 +1366,16 @@ if uploaded_file is not None:
                     "color": profile_colors.get(profile_name, "#95a5a6")
                 }
             }
-        
-        return portfolios
+
+        # [Fix ⑪] LW メタデータをキャッシュ戻り値に含める。
+        # 呼び出し元が LW 情報バー表示のためだけに PortfolioAnalyzer を
+        # 二重インスタンス化するのを防ぐ（初回実行時に LedoitWolf.fit() が
+        # 重複実行されていた問題を解消）。
+        _lw_meta = {
+            'cov_shrinkage': _analyzer._cov_shrinkage,
+            'lw_error':      _analyzer._lw_error,
+        }
+        return portfolios, _lw_meta
     
     # 最適化実行（キャッシュされるため、同じ入力では再計算されない）
     core_idx = selected_funds.index(core_fund)
@@ -1382,7 +1389,7 @@ if uploaded_file is not None:
     _opt_progress = st.empty()
     with st.spinner('各リスクプロファイルを最適化中...'):
         try:
-            portfolios = optimize_portfolios(
+            portfolios, _lw_meta = optimize_portfolios(
                 returns_selected,
                 tuple(selected_funds),
                 core_fund,
@@ -1413,21 +1420,24 @@ if uploaded_file is not None:
     _opt_progress.empty()
 
     # ─── [改善E] LW / 生データ 切替インフォバー ────────────────────────────
-    if _use_lw and analyzer._cov_shrinkage is not None:
+    # [Fix ⑪] LW メタデータは optimize_portfolios() の戻り値 _lw_meta から取得。
+    # PortfolioAnalyzer の二重インスタンス化（= LedoitWolf.fit() の重複実行）を解消。
+    _lw_shrinkage = _lw_meta.get('cov_shrinkage')
+    _lw_err_msg   = _lw_meta.get('lw_error')
+    if _use_lw and _lw_shrinkage is not None:
         st.markdown(
             f'<div style="background:#eff6ff;border:1px solid #93c5fd;'
             f'border-left:4px solid #1d4ed8;border-radius:6px;'
             f'padding:8px 14px;font-size:0.8rem;color:#1e3a8a;margin-bottom:8px;">'
             f'　<b>Ledoit-Wolf収縮共分散推定量を使用中</b>　'
-            f'収縮係数: <b>{analyzer._cov_shrinkage:.4f}</b>　'
+            f'収縮係数: <b>{_lw_shrinkage:.4f}</b>　'
             f'（0に近いほど生データに近い、1に近いほど強く収縮）　'
             f'サイドバーのチェックを外すと生データ版（説明性重視）に切り替わります。'
             f'</div>',
             unsafe_allow_html=True,
         )
-    elif _use_lw and analyzer._cov_shrinkage is None:
+    elif _use_lw and _lw_shrinkage is None:
         # ⑥ LW=ON だが失敗した場合の明示警告（原因メッセージを表示）
-        _lw_err_msg = getattr(analyzer, '_lw_error', None)
         if _lw_err_msg and 'scikit-learn がインストールされていません' in _lw_err_msg:
             # 最も多いケース: requirements.txt に未記載でデプロイ環境に sklearn がない
             st.warning(
