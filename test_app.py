@@ -84,8 +84,17 @@ def test_screening(df):
         ]
 
         # 欠損チェック（本番と同一: コア期間内欠損率 == 0 で絞り込み）
-        # pct_change(fill_method=None).dropna() 後のリターン系列（36行）で欠損率を計算する
-        missing_rates = df_3y[fund_cols].pct_change(fill_method=None).dropna().isnull().sum() / 36
+        # [BUG-3a修正] 旧実装は .pct_change().dropna() の後に .isnull() を計算していたため、
+        # dropna() で how='any'（デフォルト）によりすべての行が除去された状態で
+        # .isnull().sum() を呼ぶと全列の欠損数が 0 になる。
+        # 結果として、期間内に欠損を持つファンドも valid_funds に通過してしまい、
+        # 本番の「欠損率ゼロのファンドのみ通す」動作と完全に乖離していた。
+        #
+        # 修正後: pct_change() の先頭 NaN 行だけを iloc[1:] で除去し、
+        # ファンドごとの欠損率を正しく計算する。
+        # この計算方法は portfolio_app.py の STEP2（行1091）と同一。
+        _df_pct = df_3y[fund_cols].pct_change(fill_method=None).iloc[1:]   # 先頭NaN行のみ除去
+        missing_rates = _df_pct.isnull().sum() / len(_df_pct)
         valid_funds = missing_rates[missing_rates == 0].index.tolist()
 
         print(f"✓ 有効ファンド数（欠損なし）: {len(valid_funds)}")
@@ -218,7 +227,6 @@ def test_improvements(returns, core_fund, selected_funds):
         # 3回目の生成がキャッシュヒットした statistics に影響しないこと
         _ = sc2.screen_funds(core_fund, n_final=min(10, len(selected_funds)))
         sc3 = FundScreener(returns, risk_free_rate=0.005)
-        assert '相関安定性' not in sc3.statistics.columns or True, "汚染チェック"
         # ← screen_funds() は statistics に列を追加するが、キャッシュ本体は
         #   深いコピーで保護されているため sc3.statistics は追加前の状態のはず
         pure_cols = set(sc1.statistics.columns)
