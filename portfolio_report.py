@@ -864,36 +864,19 @@ def render_report_panel(
             ])
         )
 
-        # column_config で float 認識 & ソート可能にする
-        _col_cfg = {
-            'リターン\n分析期間(%)' : st.column_config.NumberColumn(
-                "リターン\n分析期間(%)", format="%.1f%%", help="分析期間ベースの年率リターン"),
-            'リターン\n設定来(%)'   : st.column_config.NumberColumn(
-                "リターン\n設定来(%)",  format="%.1f%%", help="設定来（全期間）年率リターン"),
-            '年率リスク\n分析期間(%)': st.column_config.NumberColumn(
-                "年率リスク\n分析期間(%)", format="%.1f%%", help="分析期間ベースの年率ボラティリティ"),
-            'シャープ\n分析期間'    : st.column_config.NumberColumn(
-                "シャープ\n分析期間",   format="%.2f",   help="分析期間シャープレシオ（1.0超=優秀）"),
-            '最大DD\n設定来(%)'     : st.column_config.NumberColumn(
-                "最大DD\n設定来(%)",    format="%.1f%%", help="設定来最大ドローダウン"),
-            'コア相関\n分析期間'    : st.column_config.NumberColumn(
-                "コア相関\n分析期間",   format="%.2f",   help="コアファンドとの相関（0.3〜0.7が理想）"),
-            '月次勝率\n設定来(%)'   : st.column_config.NumberColumn(
-                "月次勝率\n設定来(%)",  format="%.0f%%", help="設定来月次プラス比率"),
-        }
-
         st.dataframe(
             _styled_summ,
             use_container_width=True,
-            column_config=_col_cfg,
+            # [修正] Streamlit は Styler オブジェクトと column_config を同時指定した場合、
+            # column_config を無視する仕様がある。Styler 側の .format() で
+            # 表示フォーマットは既に制御されているため column_config は不要。
         )
         st.caption(
-            f"🔵 コアファンド「{core_fund}」行は青ハイライト（column_configによりソート可能）。"
+            f"🔵 コアファンド「{core_fund}」行は青ハイライト。"
             "　リターン: +10%超=濃緑 / +3〜10%=緑 / 0〜3%=薄緑 / マイナス=赤。"
             "　シャープ: 🟢1.0超 / 🟡0.5-1.0 / 🔴0.5未満。"
             "　最大DD: 🟢-10%以内 / 🟡-10〜-25% / 🔴-25%超。"
             "　コア相関: 🟢0.3-0.7=分散◎ / 🟡0.7-0.9=やや高 / 🔴0.9超=高相関 / 灰=低相関。"
-            "　列ヘッダーをクリックで昇順/降順ソートが可能（数値として正しく並び替え）。"
         )
     with _rpt_tab3:
         st.markdown('<div class="tab-sub-header">リスク・リターン マップ（分析期間）</div>', unsafe_allow_html=True)
