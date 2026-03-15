@@ -1190,18 +1190,16 @@ def render_report_panel(
 def render_export_section(
     portfolios, selected_funds,
     comparison_df, allocation_df_numeric, fund_stats,
+    period_months: int = 0,
 ):
     """Excel エクスポートセクション（ダウンロードボタン）を描画する。"""
-    # エクスポート機能
     st.markdown('<div class="section-header">💾 結果のエクスポート</div>', unsafe_allow_html=True)
 
     if st.button("📥 Excelファイルをダウンロード"):
-        # 結果をまとめる
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            # ポートフォリオ比較
-            # comparison_df はすべて数値型で保持されているため変換不要。
-            # Excel 列名に単位を明示するためリネームのみ行う。
+
+            # ── ポートフォリオ比較シート ──────────────────────────
             _comp_export = comparison_df.rename(columns={
                 "年率リターン": "年率リターン(%)",
                 "年平均リスク": "年平均リスク(%)",
@@ -1211,21 +1209,68 @@ def render_export_section(
             })
             _comp_export.to_excel(writer, sheet_name='ポートフォリオ比較', index=False)
 
-            # 統合ファンド構成（数値ベースの allocation_df_numeric を直接出力）
+            # ── 統合ファンド構成シート ────────────────────────────
             allocation_df_numeric.to_excel(writer, sheet_name='統合ファンド構成(%)')
 
-            # 各ポートフォリオの構成（個別シート）
-            for profile_name, portfolio in portfolios.items():
-                w = portfolio["weights"]
-                weights_export = pd.DataFrame({
-                    'ファンド': selected_funds,
-                    '比重(%)': (w * 100).round(2)
-                })
-                weights_export = weights_export[weights_export['比重(%)'] > 0.1].sort_values('比重(%)', ascending=False)
-                sheet_name = profile_name[:20]
-                weights_export.to_excel(writer, sheet_name=sheet_name, index=False)
+            # ── 各プロファイル個別シート ──────────────────────────
+            # 分析期間ラベル（例: 36ヶ月 → "3年"）
+            _period_map = {12: "1年", 36: "3年", 60: "5年", 120: "10年", 180: "15年"}
+            _period_lbl = _period_map.get(period_months, f"{period_months}ヶ月") if period_months else ""
 
-            # ファンド統計（コピーして%変換・元のDataFrameを破壊しない）
+            for profile_name, portfolio in portfolios.items():
+                w    = portfolio["weights"]
+                pst  = portfolio["stats"]
+
+                # ── 構成ファンド行（weight > 0.1%）────────────────
+                _rows = []
+                for i, fund in enumerate(selected_funds):
+                    _w_pct = round(w[i] * 100, 2)
+                    if _w_pct <= 0.1:
+                        continue
+                    # fund_stats から個別指標を取得（存在しない列はNaN）
+                    if fund in fund_stats.index:
+                        _fs  = fund_stats.loc[fund]
+                        _ret = round(float(_fs.get('年率リターン', float('nan'))) * 100, 2)
+                        _vol = round(float(_fs.get('年率ボラ',     float('nan'))) * 100, 2)
+                        _sr  = round(float(_fs.get('シャープレシオ', float('nan'))), 6)
+                        _mdd = round(float(_fs.get('最大DD',        float('nan'))) * 100, 2)
+                    else:
+                        _ret = _vol = _sr = _mdd = float('nan')
+
+                    _rows.append({
+                        'ファンド':       fund,
+                        '比重(%)':        _w_pct,
+                        '年率リターン(%)': _ret,
+                        '年平均リスク(%)': _vol,
+                        'シャープ':        _sr,
+                        '最大DD(%)':       _mdd,
+                    })
+
+                _df = pd.DataFrame(_rows).sort_values('比重(%)', ascending=False)
+
+                # ── ポートフォリオ合計行 ──────────────────────────
+                _port_ret = round(float(pst.get('年率リターン',       0)) * 100, 2)
+                _port_vol = round(float(pst.get('年率ボラティリティ', 0)) * 100, 2)
+                _port_sr  = round(float(pst.get('シャープレシオ',     0)), 3)
+                _port_mdd = round(float(pst.get('最大ドローダウン',   0)) * 100, 2)
+
+                _summary_label = f"{_period_lbl}{profile_name}ポートフォリオ" if _period_lbl else f"{profile_name}ポートフォリオ"
+                _summary_row = pd.DataFrame([{
+                    'ファンド':       _summary_label,
+                    '比重(%)':        '100%',
+                    '年率リターン(%)': _port_ret,
+                    '年平均リスク(%)': _port_vol,
+                    'シャープ':        _port_sr,
+                    '最大DD(%)':       _port_mdd,
+                }])
+
+                _export_df = pd.concat([_df, _summary_row], ignore_index=True)
+
+                # シート名: Excel の制限（31文字以内、特殊文字禁止）
+                sheet_name = (profile_name[:28] if len(profile_name) <= 28 else profile_name[:28])
+                _export_df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+            # ── ファンド統計シート ────────────────────────────────
             fund_stats_export = fund_stats.copy()
             fund_stats_export['年率リターン'] = (fund_stats_export['年率リターン'] * 100).round(2)
             fund_stats_export['年率ボラ']     = (fund_stats_export['年率ボラ']     * 100).round(2)
