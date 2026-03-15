@@ -15,6 +15,7 @@ portfolio_app.py から import して使用する。
 """
 import hashlib
 import io
+import warnings
 from datetime import datetime
 
 import numpy as np
@@ -55,12 +56,30 @@ def compute_rp_portfolio(_rets, _funds_tuple, _core_name, _lw: bool, _rf: float,
     """
     _az  = PortfolioAnalyzer(_rets, risk_free_rate=_rf, use_ledoit_wolf=_lw)
     _ci  = list(_funds_tuple).index(_core_name)
+
+    # O-04 相当: 下限可行性チェック
+    # コア最小値 + サテライト本数 × min_individual > 1.0 になると最適化が収束しない。
+    # portfolio_app.py のO-04修正と同一ロジックでここでも自動調整する。
+    _core_lo    = 0.50
+    _max_ind    = 0.20
+    _min_ind    = 0.03
+    _n_sat      = max(len(_funds_tuple) - 1, 1)
+    if _core_lo + _n_sat * _min_ind > 1.0 + 1e-6:
+        _min_ind = max(0.0, (1.0 - _core_lo) / _n_sat - 1e-6)
+        warnings.warn(
+            f"compute_rp_portfolio: 下限可行性違反のため min_individual を "
+            f"{_min_ind:.4f} に自動調整します "
+            f"(core_min={_core_lo}, n_satellite={_n_sat})",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+
     _w   = _az.optimize_portfolio(
         _ci,
         core_weight_range=(0.50, 0.65),   # バランス型と同一のコア範囲
         objective_type="risk_parity",
-        max_individual=0.20,
-        min_individual=0.03,
+        max_individual=_max_ind,
+        min_individual=_min_ind,
     )
     _st  = _az.calculate_portfolio_stats(_w)
     _cov = _az.cov_matrix.values
