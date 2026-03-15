@@ -1136,7 +1136,10 @@ if uploaded_file is not None:
     # ── バケット別スクリーニング結果の表示 ──────────────────────────────────
     _report = getattr(screener, 'screening_report', None)
     if _report:
-        with st.expander("🔍 バケット別スクリーニング結果（クリックで詳細）", expanded=False):
+        # [改善A3] キャッシュヒット時はタイトルにインジケータを表示
+        _cache_hit = getattr(screener, '_stats_cache_hit', False)
+        _cache_badge = " ⚡ 統計キャッシュ使用" if _cache_hit else ""
+        with st.expander(f"🔍 バケット別スクリーニング結果（クリックで詳細）{_cache_badge}", expanded=False):
             st.markdown(
                 '<div style="font-size:0.75rem;color:#1e3a5f;font-weight:700;margin-bottom:8px;">'
                 f'事前フィルター通過: {_report["pre_filter_pool"]}本 → 最終選定: {_report["total_selected"]}本（コア除く）'
@@ -1246,7 +1249,18 @@ if uploaded_file is not None:
             "max_individual": 0.10,
             "min_individual": 0.02,
             "target_volatility": 0.06
-        }
+        },
+        # ── [改善B1] テールリスク最小型プロファイル ─────────────────────────
+        # CVaR(95%)を直接最小化。正規分布を仮定しないため、ヘッジファンドに多い
+        # ファットテール・左歪み分布（売りオプション系・CTA等）を正しく評価できる。
+        # 「最悪シナリオの平均損失を最小化したい」保守・超保守クライアント向け。
+        "テールリスク最小型": {
+            "core_range": (0.70, 0.85),
+            "objective": "min_cvar",
+            "max_individual": 0.12,
+            "min_individual": 0.02,
+            "target_volatility": None
+        },
     }
 
     # O-04 修正：各プロファイルの下限可行性チェック。
