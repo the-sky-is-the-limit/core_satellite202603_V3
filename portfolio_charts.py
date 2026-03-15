@@ -70,297 +70,297 @@ def _render_client_view(
     port_returns, port_cum_returns,
 ):
     """顧客向けリッチHTML表示（顧客モード時に render_profile_detail から呼ばれる）。"""
-import json as _json
-import streamlit.components.v1 as _components
+    import json as _json
+    import streamlit.components.v1 as _components
 
-_color_hex = {
-    "積極型":     "#9b2c2c",
-    "やや積極型": "#c05621",
-    "バランス型": "#2f855a",
-    "やや保守型": "#2b6cb0",
-    "保守型":     "#2c5282",
-}.get(selected_profile, "#2f855a")
-_color_bg = {
-    "積極型":     "rgba(155,44,44,0.10)",
-    "やや積極型": "rgba(192,86,33,0.10)",
-    "バランス型": "rgba(47,133,90,0.10)",
-    "やや保守型": "rgba(43,108,176,0.10)",
-    "保守型":     "rgba(44,82,130,0.10)",
-}.get(selected_profile, "rgba(47,133,90,0.10)")
-_profile_desc_map = {
-    "積極型":     "リターン最大化を重視。短期的な大幅変動を許容できる方向け。",
-    "やや積極型": "成長を重視しつつリスクをある程度抑える方向け。",
-    "バランス型": "リスクとリターンのバランスを重視する標準的なポートフォリオ。",
-    "やや保守型": "元本保全を重視しながら安定的なリターンを目指す方向け。",
-    "保守型":     "元本保全を最優先。リターンよりも安定性を重視する方向け。",
-}
-_desc = _profile_desc_map.get(selected_profile, "")
+    _color_hex = {
+        "積極型":     "#9b2c2c",
+        "やや積極型": "#c05621",
+        "バランス型": "#2f855a",
+        "やや保守型": "#2b6cb0",
+        "保守型":     "#2c5282",
+    }.get(selected_profile, "#2f855a")
+    _color_bg = {
+        "積極型":     "rgba(155,44,44,0.10)",
+        "やや積極型": "rgba(192,86,33,0.10)",
+        "バランス型": "rgba(47,133,90,0.10)",
+        "やや保守型": "rgba(43,108,176,0.10)",
+        "保守型":     "rgba(44,82,130,0.10)",
+    }.get(selected_profile, "rgba(47,133,90,0.10)")
+    _profile_desc_map = {
+        "積極型":     "リターン最大化を重視。短期的な大幅変動を許容できる方向け。",
+        "やや積極型": "成長を重視しつつリスクをある程度抑える方向け。",
+        "バランス型": "リスクとリターンのバランスを重視する標準的なポートフォリオ。",
+        "やや保守型": "元本保全を重視しながら安定的なリターンを目指す方向け。",
+        "保守型":     "元本保全を最優先。リターンよりも安定性を重視する方向け。",
+    }
+    _desc = _profile_desc_map.get(selected_profile, "")
 
-_total_ret = (port_cum_returns[-1] - 1) * 100
-_ann_ret   = selected_stats["年率リターン"] * 100
-_vol       = selected_stats["年率ボラティリティ"] * 100
-_sharpe    = selected_stats["シャープレシオ"]
-_mdd       = selected_stats["最大ドローダウン"] * 100
-_sortino   = min(selected_stats["ソルティノレシオ"], 10)
-_var95     = selected_stats["月次VaR_95"] * 100
-_cvar95    = selected_stats["月次CVaR_95"] * 100
-_win_rate  = selected_stats["月次勝率"] * 100
-_core_pct  = round(selected_weights[core_idx] * 100, 1)
+    _total_ret = (port_cum_returns[-1] - 1) * 100
+    _ann_ret   = selected_stats["年率リターン"] * 100
+    _vol       = selected_stats["年率ボラティリティ"] * 100
+    _sharpe    = selected_stats["シャープレシオ"]
+    _mdd       = selected_stats["最大ドローダウン"] * 100
+    _sortino   = min(selected_stats["ソルティノレシオ"], 10)
+    _var95     = selected_stats["月次VaR_95"] * 100
+    _cvar95    = selected_stats["月次CVaR_95"] * 100
+    _win_rate  = selected_stats["月次勝率"] * 100
+    _core_pct  = round(selected_weights[core_idx] * 100, 1)
 
-_cum_data   = port_cum_returns.tolist()
-_dates_str  = [d.strftime("%Y-%m") for d in df_filtered.index[-len(port_returns):]]
-_ret_col    = "#2f855a" if _ann_ret >= 0 else "#9b2c2c"
-_tret_col   = "#2f855a" if _total_ret >= 0 else "#9b2c2c"
-_ret_sign   = "+" if _ann_ret >= 0 else ""
-_tret_sign  = "+" if _total_ret >= 0 else ""
-_sr_col     = "#2f855a" if _sharpe >= 1.0 else ("#c05621" if _sharpe >= 0.5 else "#9b2c2c")
+    _cum_data   = port_cum_returns.tolist()
+    _dates_str  = [d.strftime("%Y-%m") for d in df_filtered.index[-len(port_returns):]]
+    _ret_col    = "#2f855a" if _ann_ret >= 0 else "#9b2c2c"
+    _tret_col   = "#2f855a" if _total_ret >= 0 else "#9b2c2c"
+    _ret_sign   = "+" if _ann_ret >= 0 else ""
+    _tret_sign  = "+" if _total_ret >= 0 else ""
+    _sr_col     = "#2f855a" if _sharpe >= 1.0 else ("#c05621" if _sharpe >= 0.5 else "#9b2c2c")
 
-# 年次リターン
-_port_ret_s   = pd.Series(port_returns, index=df_filtered.index[-len(port_returns):])
-_yearly       = _port_ret_s.resample("YE").apply(lambda x: (1 + x).prod() - 1)
-_yearly_years = [str(y) for y in _yearly.index.year.tolist()]
-_yearly_vals  = (_yearly.values * 100).tolist()
+    # 年次リターン
+    _port_ret_s   = pd.Series(port_returns, index=df_filtered.index[-len(port_returns):])
+    _yearly       = _port_ret_s.resample("YE").apply(lambda x: (1 + x).prod() - 1)
+    _yearly_years = [str(y) for y in _yearly.index.year.tolist()]
+    _yearly_vals  = (_yearly.values * 100).tolist()
 
-# 構成ファンド
-_holdings = [
-    {"name": selected_funds[i].split(" ", 1)[1] if " " in selected_funds[i] else selected_funds[i],
-     "code": selected_funds[i].split(" ")[0],
-     "weight": round(selected_weights[i] * 100, 1)}
-    for i in range(len(selected_funds)) if selected_weights[i] > 0.005
-]
-_holdings.sort(key=lambda x: x["weight"], reverse=True)
+    # 構成ファンド
+    _holdings = [
+        {"name": selected_funds[i].split(" ", 1)[1] if " " in selected_funds[i] else selected_funds[i],
+         "code": selected_funds[i].split(" ")[0],
+         "weight": round(selected_weights[i] * 100, 1)}
+        for i in range(len(selected_funds)) if selected_weights[i] > 0.005
+    ]
+    _holdings.sort(key=lambda x: x["weight"], reverse=True)
 
-# Holdings HTML
-_hold_rows = ""
-for _h in _holdings[:8]:
-    _bw = min(_h["weight"], 100)
-    _hold_rows += (
-        f'<div style="display:flex;align-items:center;gap:10px;padding:7px 0;'
-        f'border-bottom:1px solid rgba(30,60,120,0.07);">'
-        f'<span style="font-family:monospace;font-size:12px;color:#1e3a5f;'
-        f'width:28px;flex-shrink:0;">{_h["code"]}</span>'
-        f'<div style="flex:1;background:rgba(30,60,120,0.07);border-radius:3px;height:5px;overflow:hidden;">'
-        f'<div style="width:{_bw}%;height:100%;background:{_color_hex};border-radius:3px;opacity:0.8;"></div>'
-        f'</div>'
-        f'<span style="font-size:12px;color:#334155;width:160px;overflow:hidden;'
-        f'white-space:nowrap;text-overflow:ellipsis;flex-shrink:0;">{_h["name"]}</span>'
-        f'<span style="font-family:monospace;font-size:13px;font-weight:700;'
-        f'color:{_color_hex};width:40px;text-align:right;flex-shrink:0;">{_h["weight"]}%</span>'
-        f'</div>'
-    )
+    # Holdings HTML
+    _hold_rows = ""
+    for _h in _holdings[:8]:
+        _bw = min(_h["weight"], 100)
+        _hold_rows += (
+            f'<div style="display:flex;align-items:center;gap:10px;padding:7px 0;'
+            f'border-bottom:1px solid rgba(30,60,120,0.07);">'
+            f'<span style="font-family:monospace;font-size:12px;color:#1e3a5f;'
+            f'width:28px;flex-shrink:0;">{_h["code"]}</span>'
+            f'<div style="flex:1;background:rgba(30,60,120,0.07);border-radius:3px;height:5px;overflow:hidden;">'
+            f'<div style="width:{_bw}%;height:100%;background:{_color_hex};border-radius:3px;opacity:0.8;"></div>'
+            f'</div>'
+            f'<span style="font-size:12px;color:#334155;width:160px;overflow:hidden;'
+            f'white-space:nowrap;text-overflow:ellipsis;flex-shrink:0;">{_h["name"]}</span>'
+            f'<span style="font-family:monospace;font-size:13px;font-weight:700;'
+            f'color:{_color_hex};width:40px;text-align:right;flex-shrink:0;">{_h["weight"]}%</span>'
+            f'</div>'
+        )
 
-_dates_json       = _json.dumps(_dates_str, ensure_ascii=False)
-_cum_json         = _json.dumps(_cum_data)
-_yearly_years_j   = _json.dumps(_yearly_years)
-_yearly_vals_j    = _json.dumps(_yearly_vals)
-_sortino_color    = "#2f855a" if _sortino >= 1.0 else _color_hex
+    _dates_json       = _json.dumps(_dates_str, ensure_ascii=False)
+    _cum_json         = _json.dumps(_cum_data)
+    _yearly_years_j   = _json.dumps(_yearly_years)
+    _yearly_vals_j    = _json.dumps(_yearly_vals)
+    _sortino_color    = "#2f855a" if _sortino >= 1.0 else _color_hex
 
-_client_html = f"""<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<style>
-*{{margin:0;padding:0;box-sizing:border-box;}}
-body{{background:#F4F6F9;color:#1A2540;font-family:'Noto Sans JP',sans-serif;font-weight:300;padding:0 0 24px;}}
-.disc-banner{{background:rgba(122,92,30,0.06);border-bottom:1px solid rgba(122,92,30,0.20);
-  padding:7px 20px;font-size:12px;color:#6b4c10;display:flex;align-items:center;gap:8px;}}
-.prof-header{{display:flex;align-items:flex-start;justify-content:space-between;
-  padding:16px 20px 14px;background:#fff;border-bottom:1px solid rgba(30,60,120,0.10);margin-bottom:14px;}}
-.prof-title{{font-family:'Noto Serif JP',serif;font-size:19px;font-weight:700;letter-spacing:0.04em;color:{_color_hex};}}
-.past-tag{{display:inline-block;background:rgba(122,92,30,0.08);border:1px solid rgba(122,92,30,0.22);
-  border-radius:3px;padding:1px 8px;font-size:11px;color:#7A5C1E;letter-spacing:0.06em;margin-left:8px;}}
-.prof-sub{{font-size:13px;color:#334155;margin-top:4px;font-weight:400;line-height:1.6;}}
-.core-bar-track{{width:140px;background:rgba(30,60,120,0.08);border-radius:3px;height:5px;margin-top:5px;overflow:hidden;}}
-.core-bar-fill{{height:100%;border-radius:3px;background:{_color_hex};width:{min(_core_pct,100)}%;}}
-.core-label{{font-size:12px;color:#334155;margin-top:4px;font-weight:400;}}
-.metrics-grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:0 20px 14px;}}
-.mc{{background:#fff;border:1px solid rgba(30,60,120,0.10);border-radius:9px;padding:14px 14px 12px;
-  box-shadow:0 1px 4px rgba(30,60,120,0.05);position:relative;overflow:hidden;}}
-.mc .lbl{{font-size:11px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;font-weight:600;}}
-.mc .val{{font-family:'Inter',sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.02em;line-height:1;}}
-.mc .unit{{font-size:11px;font-weight:400;opacity:0.7;}}
-.mc .note{{font-size:11px;color:#334155;margin-top:6px;line-height:1.5;}}
-.mc .warn{{font-size:11px;color:#7a5c00;margin-top:4px;font-weight:500;}}
-.lower-grid{{display:grid;grid-template-columns:2fr 1fr;gap:10px;padding:0 20px 14px;}}
-.card{{background:#fff;border:1px solid rgba(30,60,120,0.10);border-radius:9px;padding:16px 16px 12px;
-  box-shadow:0 1px 4px rgba(30,60,120,0.05);}}
-.card-title{{font-size:12px;color:#1e3a5f;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;font-weight:600;}}
-.card-sub{{font-size:12px;color:#334155;margin-bottom:12px;line-height:1.5;}}
-.chart-wrap{{position:relative;height:220px;}}
-.risk-row{{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0 20px 14px;}}
-.rc{{background:#fff;border:1px solid rgba(30,60,120,0.10);border-radius:9px;padding:12px 14px;
-  box-shadow:0 1px 4px rgba(30,60,120,0.05);}}
-.rc .lbl{{font-size:11px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;font-weight:600;}}
-.rc .val{{font-family:'Inter',sans-serif;font-size:18px;font-weight:700;letter-spacing:-0.01em;}}
-.rc .note{{font-size:11px;color:#334155;margin-top:4px;line-height:1.5;}}
-.disc-box{{margin:0 20px;background:rgba(122,92,30,0.04);border:1px solid rgba(122,92,30,0.16);
-  border-radius:9px;padding:16px 18px;}}
-.disc-box h4{{font-size:11px;color:#7A5C1E;letter-spacing:0.08em;text-transform:uppercase;
-  margin-bottom:8px;display:flex;align-items:center;gap:5px;font-weight:700;}}
-.disc-box p{{font-size:12px;color:#334155;line-height:1.9;margin-bottom:5px;}}
-.yearly-wrap{{padding:0 20px 14px;}}
-</style>
-</head>
-<body>
-<div class="disc-banner">
-  <span>⚠</span>
-  <span>本資料は過去の運用実績に基づく分析・解説を目的としており、将来の運用成果を保証・示唆するものではありません。</span>
-</div>
-<div class="prof-header">
-  <div>
-<div class="prof-title">{selected_profile}<span class="past-tag">過去実績分析</span></div>
-<div class="prof-sub">{_desc}&nbsp;&nbsp;分析期間：{_period_start}〜{_period_end}（{_period_months}ヶ月）</div>
-  </div>
-  <div style="text-align:right;">
-<div style="font-size:12px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;font-weight:600;">コアファンド比率</div>
-<div class="core-bar-track"><div class="core-bar-fill"></div></div>
-<div class="core-label">{core_fund}: {_core_pct}%　→ 残りサテライト資産</div>
-  </div>
-</div>
-<div class="metrics-grid">
-  <div class="mc" style="border-top:2px solid {_tret_col};">
-<div class="lbl">累積リターン</div>
-<div class="val" style="color:{_tret_col};">{_tret_sign}{_total_ret:.2f}<span class="unit">%</span></div>
-<div class="note">分析期間全体（設定来ベース）</div>
-<div class="warn">⚑ 過去の実績値</div>
-  </div>
-  <div class="mc" style="border-top:2px solid {_ret_col};">
-<div class="lbl">年率リターン (CAGR)</div>
-<div class="val" style="color:{_ret_col};">{_ret_sign}{_ann_ret:.2f}<span class="unit">%</span></div>
-<div class="note">幾何平均・複利計算ベース</div>
-<div class="warn">⚑ 過去の実績値</div>
-  </div>
-  <div class="mc" style="border-top:2px solid {_color_hex};">
-<div class="lbl">年率ボラティリティ</div>
-<div class="val" style="color:{_color_hex};">{_vol:.2f}<span class="unit">%</span></div>
-<div class="note">月次標準偏差を年率換算</div>
-<div class="warn">⚑ 過去の変動幅</div>
-  </div>
-  <div class="mc" style="border-top:2px solid {_sr_col};">
-<div class="lbl">シャープレシオ</div>
-<div class="val" style="color:{_sr_col};">{_sharpe:.2f}</div>
-<div class="note">リスク1単位あたりの超過収益</div>
-<div class="warn">⚑ 1以上が目安（過去値）</div>
-  </div>
-  <div class="mc" style="border-top:2px solid {_color_hex};">
-<div class="lbl">月次勝率</div>
-<div class="val" style="color:{_color_hex};">{_win_rate:.1f}<span class="unit">%</span></div>
-<div class="note">プラス月数 ÷ 全月数</div>
-<div class="warn">⚑ 過去の実績値</div>
-  </div>
-</div>
-<div class="lower-grid">
-  <div class="card">
-<div class="card-title">基準価額の推移（指数化：初月＝1.0000）</div>
-<div class="card-sub">分析開始月を1.0000として指数化。将来の推移を示すものではありません。</div>
-<div class="chart-wrap"><canvas id="cumChart"></canvas></div>
-  </div>
-  <div class="card">
-<div class="card-title">ポートフォリオ構成</div>
-<div style="margin-top:8px;">{_hold_rows}</div>
-  </div>
-</div>
-<div class="risk-row">
-  <div class="rc">
-<div class="lbl">最大ドローダウン (MDD)</div>
-<div class="val" style="color:#9b2c2c;">{_mdd:.2f}<span style="font-size:11px;font-weight:400;">%</span></div>
-<div class="note">過去最大の峰から谷への下落幅</div>
-  </div>
-  <div class="rc">
-<div class="lbl">ソルティノレシオ</div>
-<div class="val" style="color:{_sortino_color};">{_sortino:.2f}</div>
-<div class="note">下方リスク1単位あたりの超過収益</div>
-  </div>
-  <div class="rc">
-<div class="lbl">月次 VaR (95%)</div>
-<div class="val" style="color:#c05621;">{_var95:.2f}<span style="font-size:11px;font-weight:400;">%</span></div>
-<div class="note">月次で5%確率を超える損失の推計</div>
-  </div>
-  <div class="rc">
-<div class="lbl">月次 CVaR (95%)</div>
-<div class="val" style="color:#c05621;">{_cvar95:.2f}<span style="font-size:11px;font-weight:400;">%</span></div>
-<div class="note">VaR超過時の期待損失</div>
-  </div>
-</div>
-<div class="yearly-wrap">
-  <div class="card">
-<div class="card-title">年次リターン（棒グラフ）<span style="margin-left:8px;background:rgba(122,92,30,0.08);border:1px solid rgba(122,92,30,0.22);border-radius:3px;padding:1px 7px;font-size:11px;color:#7A5C1E;letter-spacing:0.06em;">過去実績</span></div>
-<div class="card-sub">各暦年の実現リターン。将来の年次リターンを予測するものではありません。</div>
-<div class="chart-wrap" style="height:180px;"><canvas id="yearlyChart"></canvas></div>
-  </div>
-</div>
-<div class="disc-box">
-  <h4>⚖ 重要な注意事項</h4>
-  <p>本資料に掲載されているリターン・リスク指標はすべて<strong>過去の実績値</strong>であり、将来の運用成果を保証・約束するものでは一切ありません。記載の数値は手数料・税金を考慮していない場合があります。</p>
-  <p>外国籍ファンドへの投資は、為替リスク・カントリーリスク・流動性リスク等を含む各種リスクを伴います。最大ドローダウンは過去の損失最大値であり、今後さらに大きな損失が生じる可能性を否定するものではありません。</p>
-  <p>ヘッジファンドダイレクト株式会社は関東財務局長（金商）第532号の登録投資助言業者です。本資料は情報提供のみを目的としており、特定ファンドへの投資を勧誘・推奨するものではありません。</p>
-</div>
-<script>
-(function(){{
-  var dates={_dates_json};
-  var cum={_cum_json};
-  var yYears={_yearly_years_j};
-  var yVals={_yearly_vals_j};
-  var color="{_color_hex}";
-  var colorBg="{_color_bg}";
-  var ctx1=document.getElementById("cumChart").getContext("2d");
-  new Chart(ctx1,{{type:"line",data:{{labels:dates,datasets:[{{
-label:"{selected_profile}（過去実績）",data:cum,
-borderColor:color,backgroundColor:colorBg,borderWidth:2,
-pointRadius:0,pointHoverRadius:4,fill:true,tension:0.3
-  }},{{
-label:"元本基準（1.0）",
-data:dates.map(function(){{return 1.0;}}),
-borderColor:"rgba(30,60,120,0.18)",borderWidth:1,
-borderDash:[4,4],pointRadius:0,fill:false
-  }}]}},options:{{
-responsive:true,maintainAspectRatio:false,animation:{{duration:600}},
-interaction:{{mode:"index",intersect:false}},
-plugins:{{
-  legend:{{labels:{{color:"#4A5E7A",font:{{size:10}},boxWidth:14,padding:10}}}},
-  tooltip:{{backgroundColor:"#fff",borderColor:color,borderWidth:1,
-    titleColor:"#1A2540",bodyColor:"#4A5E7A",
-    callbacks:{{label:function(c){{
-      if(c.datasetIndex===0){{
-var v=c.parsed.y,chg=((v-1)*100).toFixed(2);
-return" "+c.dataset.label+": "+v.toFixed(4)+"  ("+(chg>=0?"+":"")+chg+"%)";
-      }}return null;
-    }}}}
-  }}
-}},
-scales:{{
-  x:{{ticks:{{color:"#33465e",font:{{size:9}},maxTicksLimit:10,maxRotation:0}},grid:{{color:"rgba(30,60,120,0.06)"}}}},
-  y:{{ticks:{{color:"#33465e",font:{{size:9}},callback:function(v){{return v.toFixed(2);}}}},grid:{{color:"rgba(30,60,120,0.07)"}}}}
-}}
-  }}}});
-  var ctx2=document.getElementById("yearlyChart").getContext("2d");
-  new Chart(ctx2,{{type:"bar",data:{{labels:yYears,datasets:[{{
-label:"年次リターン（実績）",data:yVals,
-backgroundColor:yVals.map(function(v){{return v>=0?colorBg:"rgba(217,64,48,0.12)"}}),
-borderColor:yVals.map(function(v){{return v>=0?color:"#9b2c2c"}}),
-borderWidth:2,borderRadius:4
-  }}]}},options:{{
-responsive:true,maintainAspectRatio:false,animation:{{duration:500}},
-plugins:{{
-  legend:{{display:false}},
-  tooltip:{{backgroundColor:"#fff",borderColor:color,borderWidth:1,
-    titleColor:"#1A2540",bodyColor:"#4A5E7A",
-    callbacks:{{label:function(c){{return" "+c.parsed.y.toFixed(2)+"%";}}}}
-  }}
-}},
-scales:{{
-  x:{{ticks:{{color:"#33465e",font:{{size:10}}}},grid:{{display:false}}}},
-  y:{{ticks:{{color:"#33465e",font:{{size:9}},callback:function(v){{return v.toFixed(1)+"%";}}}},grid:{{color:"rgba(30,60,120,0.07)"}}}}
-}}
-  }}}});
-}})();
-</script>
-</body>
-</html>"""
-_components.html(_client_html, height=1020, scrolling=True)
+    _client_html = f"""<!DOCTYPE html>
+    <html lang="ja">
+    <head>
+    <meta charset="UTF-8">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <style>
+    *{{margin:0;padding:0;box-sizing:border-box;}}
+    body{{background:#F4F6F9;color:#1A2540;font-family:'Noto Sans JP',sans-serif;font-weight:300;padding:0 0 24px;}}
+    .disc-banner{{background:rgba(122,92,30,0.06);border-bottom:1px solid rgba(122,92,30,0.20);
+      padding:7px 20px;font-size:12px;color:#6b4c10;display:flex;align-items:center;gap:8px;}}
+    .prof-header{{display:flex;align-items:flex-start;justify-content:space-between;
+      padding:16px 20px 14px;background:#fff;border-bottom:1px solid rgba(30,60,120,0.10);margin-bottom:14px;}}
+    .prof-title{{font-family:'Noto Serif JP',serif;font-size:19px;font-weight:700;letter-spacing:0.04em;color:{_color_hex};}}
+    .past-tag{{display:inline-block;background:rgba(122,92,30,0.08);border:1px solid rgba(122,92,30,0.22);
+      border-radius:3px;padding:1px 8px;font-size:11px;color:#7A5C1E;letter-spacing:0.06em;margin-left:8px;}}
+    .prof-sub{{font-size:13px;color:#334155;margin-top:4px;font-weight:400;line-height:1.6;}}
+    .core-bar-track{{width:140px;background:rgba(30,60,120,0.08);border-radius:3px;height:5px;margin-top:5px;overflow:hidden;}}
+    .core-bar-fill{{height:100%;border-radius:3px;background:{_color_hex};width:{min(_core_pct,100)}%;}}
+    .core-label{{font-size:12px;color:#334155;margin-top:4px;font-weight:400;}}
+    .metrics-grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:0 20px 14px;}}
+    .mc{{background:#fff;border:1px solid rgba(30,60,120,0.10);border-radius:9px;padding:14px 14px 12px;
+      box-shadow:0 1px 4px rgba(30,60,120,0.05);position:relative;overflow:hidden;}}
+    .mc .lbl{{font-size:11px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;font-weight:600;}}
+    .mc .val{{font-family:'Inter',sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.02em;line-height:1;}}
+    .mc .unit{{font-size:11px;font-weight:400;opacity:0.7;}}
+    .mc .note{{font-size:11px;color:#334155;margin-top:6px;line-height:1.5;}}
+    .mc .warn{{font-size:11px;color:#7a5c00;margin-top:4px;font-weight:500;}}
+    .lower-grid{{display:grid;grid-template-columns:2fr 1fr;gap:10px;padding:0 20px 14px;}}
+    .card{{background:#fff;border:1px solid rgba(30,60,120,0.10);border-radius:9px;padding:16px 16px 12px;
+      box-shadow:0 1px 4px rgba(30,60,120,0.05);}}
+    .card-title{{font-size:12px;color:#1e3a5f;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;font-weight:600;}}
+    .card-sub{{font-size:12px;color:#334155;margin-bottom:12px;line-height:1.5;}}
+    .chart-wrap{{position:relative;height:220px;}}
+    .risk-row{{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0 20px 14px;}}
+    .rc{{background:#fff;border:1px solid rgba(30,60,120,0.10);border-radius:9px;padding:12px 14px;
+      box-shadow:0 1px 4px rgba(30,60,120,0.05);}}
+    .rc .lbl{{font-size:11px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;font-weight:600;}}
+    .rc .val{{font-family:'Inter',sans-serif;font-size:18px;font-weight:700;letter-spacing:-0.01em;}}
+    .rc .note{{font-size:11px;color:#334155;margin-top:4px;line-height:1.5;}}
+    .disc-box{{margin:0 20px;background:rgba(122,92,30,0.04);border:1px solid rgba(122,92,30,0.16);
+      border-radius:9px;padding:16px 18px;}}
+    .disc-box h4{{font-size:11px;color:#7A5C1E;letter-spacing:0.08em;text-transform:uppercase;
+      margin-bottom:8px;display:flex;align-items:center;gap:5px;font-weight:700;}}
+    .disc-box p{{font-size:12px;color:#334155;line-height:1.9;margin-bottom:5px;}}
+    .yearly-wrap{{padding:0 20px 14px;}}
+    </style>
+    </head>
+    <body>
+    <div class="disc-banner">
+      <span>⚠</span>
+      <span>本資料は過去の運用実績に基づく分析・解説を目的としており、将来の運用成果を保証・示唆するものではありません。</span>
+    </div>
+    <div class="prof-header">
+      <div>
+    <div class="prof-title">{selected_profile}<span class="past-tag">過去実績分析</span></div>
+    <div class="prof-sub">{_desc}&nbsp;&nbsp;分析期間：{_period_start}〜{_period_end}（{_period_months}ヶ月）</div>
+      </div>
+      <div style="text-align:right;">
+    <div style="font-size:12px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;font-weight:600;">コアファンド比率</div>
+    <div class="core-bar-track"><div class="core-bar-fill"></div></div>
+    <div class="core-label">{core_fund}: {_core_pct}%　→ 残りサテライト資産</div>
+      </div>
+    </div>
+    <div class="metrics-grid">
+      <div class="mc" style="border-top:2px solid {_tret_col};">
+    <div class="lbl">累積リターン</div>
+    <div class="val" style="color:{_tret_col};">{_tret_sign}{_total_ret:.2f}<span class="unit">%</span></div>
+    <div class="note">分析期間全体（設定来ベース）</div>
+    <div class="warn">⚑ 過去の実績値</div>
+      </div>
+      <div class="mc" style="border-top:2px solid {_ret_col};">
+    <div class="lbl">年率リターン (CAGR)</div>
+    <div class="val" style="color:{_ret_col};">{_ret_sign}{_ann_ret:.2f}<span class="unit">%</span></div>
+    <div class="note">幾何平均・複利計算ベース</div>
+    <div class="warn">⚑ 過去の実績値</div>
+      </div>
+      <div class="mc" style="border-top:2px solid {_color_hex};">
+    <div class="lbl">年率ボラティリティ</div>
+    <div class="val" style="color:{_color_hex};">{_vol:.2f}<span class="unit">%</span></div>
+    <div class="note">月次標準偏差を年率換算</div>
+    <div class="warn">⚑ 過去の変動幅</div>
+      </div>
+      <div class="mc" style="border-top:2px solid {_sr_col};">
+    <div class="lbl">シャープレシオ</div>
+    <div class="val" style="color:{_sr_col};">{_sharpe:.2f}</div>
+    <div class="note">リスク1単位あたりの超過収益</div>
+    <div class="warn">⚑ 1以上が目安（過去値）</div>
+      </div>
+      <div class="mc" style="border-top:2px solid {_color_hex};">
+    <div class="lbl">月次勝率</div>
+    <div class="val" style="color:{_color_hex};">{_win_rate:.1f}<span class="unit">%</span></div>
+    <div class="note">プラス月数 ÷ 全月数</div>
+    <div class="warn">⚑ 過去の実績値</div>
+      </div>
+    </div>
+    <div class="lower-grid">
+      <div class="card">
+    <div class="card-title">基準価額の推移（指数化：初月＝1.0000）</div>
+    <div class="card-sub">分析開始月を1.0000として指数化。将来の推移を示すものではありません。</div>
+    <div class="chart-wrap"><canvas id="cumChart"></canvas></div>
+      </div>
+      <div class="card">
+    <div class="card-title">ポートフォリオ構成</div>
+    <div style="margin-top:8px;">{_hold_rows}</div>
+      </div>
+    </div>
+    <div class="risk-row">
+      <div class="rc">
+    <div class="lbl">最大ドローダウン (MDD)</div>
+    <div class="val" style="color:#9b2c2c;">{_mdd:.2f}<span style="font-size:11px;font-weight:400;">%</span></div>
+    <div class="note">過去最大の峰から谷への下落幅</div>
+      </div>
+      <div class="rc">
+    <div class="lbl">ソルティノレシオ</div>
+    <div class="val" style="color:{_sortino_color};">{_sortino:.2f}</div>
+    <div class="note">下方リスク1単位あたりの超過収益</div>
+      </div>
+      <div class="rc">
+    <div class="lbl">月次 VaR (95%)</div>
+    <div class="val" style="color:#c05621;">{_var95:.2f}<span style="font-size:11px;font-weight:400;">%</span></div>
+    <div class="note">月次で5%確率を超える損失の推計</div>
+      </div>
+      <div class="rc">
+    <div class="lbl">月次 CVaR (95%)</div>
+    <div class="val" style="color:#c05621;">{_cvar95:.2f}<span style="font-size:11px;font-weight:400;">%</span></div>
+    <div class="note">VaR超過時の期待損失</div>
+      </div>
+    </div>
+    <div class="yearly-wrap">
+      <div class="card">
+    <div class="card-title">年次リターン（棒グラフ）<span style="margin-left:8px;background:rgba(122,92,30,0.08);border:1px solid rgba(122,92,30,0.22);border-radius:3px;padding:1px 7px;font-size:11px;color:#7A5C1E;letter-spacing:0.06em;">過去実績</span></div>
+    <div class="card-sub">各暦年の実現リターン。将来の年次リターンを予測するものではありません。</div>
+    <div class="chart-wrap" style="height:180px;"><canvas id="yearlyChart"></canvas></div>
+      </div>
+    </div>
+    <div class="disc-box">
+      <h4>⚖ 重要な注意事項</h4>
+      <p>本資料に掲載されているリターン・リスク指標はすべて<strong>過去の実績値</strong>であり、将来の運用成果を保証・約束するものでは一切ありません。記載の数値は手数料・税金を考慮していない場合があります。</p>
+      <p>外国籍ファンドへの投資は、為替リスク・カントリーリスク・流動性リスク等を含む各種リスクを伴います。最大ドローダウンは過去の損失最大値であり、今後さらに大きな損失が生じる可能性を否定するものではありません。</p>
+      <p>ヘッジファンドダイレクト株式会社は関東財務局長（金商）第532号の登録投資助言業者です。本資料は情報提供のみを目的としており、特定ファンドへの投資を勧誘・推奨するものではありません。</p>
+    </div>
+    <script>
+    (function(){{
+      var dates={_dates_json};
+      var cum={_cum_json};
+      var yYears={_yearly_years_j};
+      var yVals={_yearly_vals_j};
+      var color="{_color_hex}";
+      var colorBg="{_color_bg}";
+      var ctx1=document.getElementById("cumChart").getContext("2d");
+      new Chart(ctx1,{{type:"line",data:{{labels:dates,datasets:[{{
+    label:"{selected_profile}（過去実績）",data:cum,
+    borderColor:color,backgroundColor:colorBg,borderWidth:2,
+    pointRadius:0,pointHoverRadius:4,fill:true,tension:0.3
+      }},{{
+    label:"元本基準（1.0）",
+    data:dates.map(function(){{return 1.0;}}),
+    borderColor:"rgba(30,60,120,0.18)",borderWidth:1,
+    borderDash:[4,4],pointRadius:0,fill:false
+      }}]}},options:{{
+    responsive:true,maintainAspectRatio:false,animation:{{duration:600}},
+    interaction:{{mode:"index",intersect:false}},
+    plugins:{{
+      legend:{{labels:{{color:"#4A5E7A",font:{{size:10}},boxWidth:14,padding:10}}}},
+      tooltip:{{backgroundColor:"#fff",borderColor:color,borderWidth:1,
+        titleColor:"#1A2540",bodyColor:"#4A5E7A",
+        callbacks:{{label:function(c){{
+          if(c.datasetIndex===0){{
+    var v=c.parsed.y,chg=((v-1)*100).toFixed(2);
+    return" "+c.dataset.label+": "+v.toFixed(4)+"  ("+(chg>=0?"+":"")+chg+"%)";
+          }}return null;
+        }}}}
+      }}
+    }},
+    scales:{{
+      x:{{ticks:{{color:"#33465e",font:{{size:9}},maxTicksLimit:10,maxRotation:0}},grid:{{color:"rgba(30,60,120,0.06)"}}}},
+      y:{{ticks:{{color:"#33465e",font:{{size:9}},callback:function(v){{return v.toFixed(2);}}}},grid:{{color:"rgba(30,60,120,0.07)"}}}}
+    }}
+      }}}});
+      var ctx2=document.getElementById("yearlyChart").getContext("2d");
+      new Chart(ctx2,{{type:"bar",data:{{labels:yYears,datasets:[{{
+    label:"年次リターン（実績）",data:yVals,
+    backgroundColor:yVals.map(function(v){{return v>=0?colorBg:"rgba(217,64,48,0.12)"}}),
+    borderColor:yVals.map(function(v){{return v>=0?color:"#9b2c2c"}}),
+    borderWidth:2,borderRadius:4
+      }}]}},options:{{
+    responsive:true,maintainAspectRatio:false,animation:{{duration:500}},
+    plugins:{{
+      legend:{{display:false}},
+      tooltip:{{backgroundColor:"#fff",borderColor:color,borderWidth:1,
+        titleColor:"#1A2540",bodyColor:"#4A5E7A",
+        callbacks:{{label:function(c){{return" "+c.parsed.y.toFixed(2)+"%";}}}}
+      }}
+    }},
+    scales:{{
+      x:{{ticks:{{color:"#33465e",font:{{size:10}}}},grid:{{display:false}}}},
+      y:{{ticks:{{color:"#33465e",font:{{size:9}},callback:function(v){{return v.toFixed(1)+"%";}}}},grid:{{color:"rgba(30,60,120,0.07)"}}}}
+    }}
+      }}}});
+    }})();
+    </script>
+    </body>
+    </html>"""
+    _components.html(_client_html, height=1020, scrolling=True)
 
 
 
