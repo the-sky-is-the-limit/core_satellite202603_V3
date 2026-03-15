@@ -1143,7 +1143,7 @@ if uploaded_file is not None:
         # [改善A3] キャッシュヒット時はタイトルにインジケータを表示
         _cache_hit = getattr(screener, '_stats_cache_hit', False)
         _cache_badge = " ⚡ 統計キャッシュ使用" if _cache_hit else ""
-        with st.expander(f"🔍 バケット別スクリーニング結果（クリックで詳細）{_cache_badge}", expanded=False):
+        with st.expander(f"バケット別スクリーニング結果（クリックで詳細）{_cache_badge}", expanded=False):
             st.markdown(
                 '<div style="font-size:0.75rem;color:#1e3a5f;font-weight:700;margin-bottom:8px;">'
                 f'事前フィルター通過: {_report["pre_filter_pool"]}本 → 最終選定: {_report["total_selected"]}本（コア除く）'
