@@ -861,7 +861,7 @@ if uploaded_file is not None:
     st.sidebar.markdown("""
 <div style="padding:4px 0 8px 0;">
   <div style="font-size:0.7rem;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;
-              color:#b3904a;margin-bottom:2px;">🔍 詳細設定</div>
+              color:#b3904a;margin-bottom:2px;">詳細設定</div>
   <div style="font-size:0.65rem;color:#66788a;">スクリーニング条件をカスタマイズ</div>
 </div>
 """, unsafe_allow_html=True)
@@ -1509,7 +1509,7 @@ if uploaded_file is not None:
     )
 
     # 詳細分析セクション（外側：プロファイルタブ）
-    st.markdown('<div class="section-header">🔍 プロファイル別 詳細分析</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">プロファイル別 詳細分析</div>', unsafe_allow_html=True)
 
     # 標準5プロファイルのみを外側タブの基本セットとする
     # テールリスク最小型は portfolios dict に含まれているが、
