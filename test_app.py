@@ -75,9 +75,13 @@ def test_screening(df):
         # と +1 を明示しているのと同様にここでも -37 に修正する。
         df_3y = df.iloc[-37:]
 
-        # [BUG-2修正] portfolio_app.py と同一のフィルタ：通貨ペア列のみ除外
-        # 旧実装は先頭文字（J/L/M/P/R/S）で絞り込んでいたため本番とファンド数が乖離していた
-        fund_cols = [col for col in df_3y.columns if col not in CURRENCY_KEYWORDS]
+        # [BUG-2修正] portfolio_app.py と同一の**部分文字列マッチ**に統一。
+        # 旧実装は `col not in CURRENCY_KEYWORDS`（完全一致）だったため、
+        # "USD-JPY_hedge" のような複合列名が除外されずに本番と動作が乖離していた。
+        fund_cols = [
+            col for col in df_3y.columns
+            if not any(curr in col for curr in CURRENCY_KEYWORDS)
+        ]
 
         # 欠損チェック（本番と同一: コア期間内欠損率 == 0 で絞り込み）
         # pct_change(fill_method=None).dropna() 後のリターン系列（36行）で欠損率を計算する
@@ -178,13 +182,17 @@ def test_optimization(returns, core_fund, selected_funds):
 
 def test_improvements(returns, core_fund, selected_funds):
     """
-    改善機能テスト（A2・A3・B1・B3）
+    改善機能テスト（A3 統計キャッシュ・A2 クラスタリング多様性・B1 CVaR・B3 再現性）
 
     データが存在する場合のみ実行。各改善の基本動作と
     既存機能との後方互換性を検証する。
+
+    [MINOR-3修正] 旧コメントは「A2 PCA」「B3 並列化」と記載していたが、
+    実装は PCA ではなくウォード法クラスタリング（A2）、並列実行ではなく
+    シード固定マルチスタートの再現性確認（B3）であったため修正した。
     """
     print("\n" + "=" * 60)
-    print("テスト4: 改善機能（A2 PCA・A3 キャッシュ・B1 CVaR・B3 並列化）")
+    print("テスト4: 改善機能（A3 キャッシュ・A2 クラスタリング・B1 CVaR・B3 再現性）")
     print("=" * 60)
 
     if returns is None or core_fund is None or selected_funds is None:
@@ -226,23 +234,25 @@ def test_improvements(returns, core_fund, selected_funds):
         import traceback; traceback.print_exc()
         all_ok = False
 
-    # ── A2: PCAファクター多様性（クラスタリング） ────────────────────────
-    print("\n[A2] PCAファクター距離混合クラスタリング")
+    # ── A2: バケット内クラスタリング多様性（ウォード法） ────────────────────
+    # [MINOR-3修正] 旧コメントは「PCAファクター距離混合クラスタリング」と記載していたが、
+    # 実装は相関距離＋ウォード法による階層クラスタリング（改善D）であるため修正した。
+    # また pca_weight パラメータは screen_funds() に存在しないため関連コメントも削除した。
+    print("\n[A2] バケット内クラスタリング多様性（ウォード法）")
     try:
         screener = FundScreener(returns, risk_free_rate=0.005)
-        # pca_weight=0.30（デフォルト）と 0.0（旧実装相当）の両方でスクリーニング
         n_sel = min(10, len(returns.columns))
-        sel_pca  = screener.screen_funds(core_fund, n_final=n_sel)
-        # キャッシュ経由で2回目
+        sel_c1 = screener.screen_funds(core_fund, n_final=n_sel)
+        # キャッシュ経由で2回目 → 同一結果になることを確認（再現性チェック）
         screener2 = FundScreener(returns, risk_free_rate=0.005)
-        sel_pca2 = screener2.screen_funds(core_fund, n_final=n_sel)
+        sel_c2 = screener2.screen_funds(core_fund, n_final=n_sel)
 
-        assert len(sel_pca)  >= 2, "PCA有効時の選定数が不足"
-        assert len(sel_pca2) >= 2, "PCAキャッシュ2回目の選定数が不足"
-        assert sel_pca[0] == core_fund,  "コアファンドが先頭でない（PCA有効時）"
-        assert sel_pca2[0] == core_fund, "コアファンドが先頭でない（2回目）"
-        print(f"  ✓ 選定: {len(sel_pca)}本（PCA混合距離）")
-        print(f"  ✓ 再現性確認: 1回目と2回目の選定一致 = {sel_pca == sel_pca2}")
+        assert len(sel_c1)  >= 2, "クラスタリング有効時の選定数が不足"
+        assert len(sel_c2)  >= 2, "2回目の選定数が不足"
+        assert sel_c1[0] == core_fund, "コアファンドが先頭でない（1回目）"
+        assert sel_c2[0] == core_fund, "コアファンドが先頭でない（2回目）"
+        print(f"  ✓ 選定: {len(sel_c1)}本（ウォード法クラスタリング）")
+        print(f"  ✓ 再現性確認: 1回目と2回目の選定一致 = {sel_c1 == sel_c2}")
     except Exception as e:
         print(f"  ✗ エラー: {e}")
         import traceback; traceback.print_exc()
@@ -288,14 +298,19 @@ def test_improvements(returns, core_fund, selected_funds):
         import traceback; traceback.print_exc()
         all_ok = False
 
-    # ── B3: 並列化（実行時間の比較）────────────────────────────────────────
-    print("\n[B3] マルチスタート並列化")
+    # ── B3: マルチスタート再現性確認 ─────────────────────────────────────────
+    # [MINOR-3修正] 旧コメントは「並列化（実行時間の比較）」と記載していたが、
+    # optimize_portfolio() の実装はシリアル実行（マルチスタート＋乱数シード固定）であり
+    # 並列実行ではない。このテストの実際の検証内容は「シード固定による結果の再現性」
+    # であるため、タイトルとアサーションメッセージを修正した。
+    print("\n[B3] マルチスタート再現性（シード固定）")
     try:
         import time
         analyzer = PortfolioAnalyzer(returns, risk_free_rate=0.005)
         core_idx = selected_funds.index(core_fund)
 
         # シャープ最大化（デフォルト8スタート）を2回実行して結果の再現性を確認
+        # 乱数シード(42/99)が固定されているため完全一致するはず
         t0 = time.perf_counter()
         w1 = analyzer.optimize_portfolio(
             core_idx, core_weight_range=(0.5, 0.6),
@@ -309,7 +324,7 @@ def test_improvements(returns, core_fund, selected_funds):
         t2 = time.perf_counter()
 
         # ウェイトの再現性（乱数シード固定のため完全一致するはず）
-        assert np.allclose(w1, w2, atol=1e-5), "並列化後のウェイト再現性に問題あり"
+        assert np.allclose(w1, w2, atol=1e-5), "マルチスタートのウェイト再現性に問題あり"
         assert abs(w1.sum() - 1.0) < 1e-4, f"ウェイト合計異常: {w1.sum():.8f}"
 
         print(f"  ✓ 実行時間: 1回目={t1-t0:.2f}s, 2回目={t2-t1:.2f}s")
