@@ -31,19 +31,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# ─── デザインシステム定数 ────────────────────────────────────
-# 仕様書 Section 2.2 に準拠したプロファイル別テーマカラー
-_PROFILE_META = {
-    "積極型":     {"color": "#9b2c2c", "grad": "linear-gradient(135deg,#9b2c2c,#7b1f1f)", "label_en": "Aggressive",   "icon": "▲▲"},
-    "やや積極型": {"color": "#c05621", "grad": "linear-gradient(135deg,#c05621,#9a4218)", "label_en": "Growth",       "icon": "▲"},
-    "バランス型": {"color": "#2f855a", "grad": "linear-gradient(135deg,#2f855a,#236644)", "label_en": "Balanced",     "icon": "◆"},
-    "やや保守型": {"color": "#2b6cb0", "grad": "linear-gradient(135deg,#2b6cb0,#1e4f8a)", "label_en": "Moderate",     "icon": "▼"},
-    "保守型":     {"color": "#2c5282", "grad": "linear-gradient(135deg,#2c5282,#1e3a63)", "label_en": "Conservative", "icon": "▼▼"},
-}
-_BRAND_NAVY  = "#0f172a"
-_BRAND_GOLD  = "#b3904a"
-_BRAND_LIGHT = "#f8fafc"
-
 # カスタムCSS
 st.markdown("""
 <style>
