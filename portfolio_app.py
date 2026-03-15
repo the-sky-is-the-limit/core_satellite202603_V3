@@ -649,7 +649,7 @@ st.markdown("""
       <span style="background:linear-gradient(135deg,#b3904a,#8a6a30);color:#0f172a;
                    border-radius:4px;padding:2px 8px;font-size:0.65rem;font-weight:800;
                    letter-spacing:0.08em;flex-shrink:0;">STEP 3</span>
-      <span style="font-size:0.78rem;font-weight:700;color:#1e3a5f;">分析実行</span>
+      <span style="font-size:0.78rem;font-weight:700;color:#1e3a5f;">🚀 分析実行</span>
     </div>
     <div style="font-size:0.65rem;color:#66788a;margin-top:3px;">最適化 → 5段階プロファイル生成</div>
   </div>
@@ -847,7 +847,7 @@ if uploaded_file is not None:
 </div><!-- /settings-panel-body -->
 """, unsafe_allow_html=True)
 
-    run_button = st.button("分析実行　— ポートフォリオ最適化を開始", type="primary", use_container_width=True)
+    run_button = st.button("🚀　分析実行　— ポートフォリオ最適化を開始", type="primary", use_container_width=True)
 
     st.markdown("""
 <div style="font-size:0.65rem;color:rgba(255,255,255,0.3);text-align:center;margin-top:6px;margin-bottom:4px;">
@@ -861,7 +861,7 @@ if uploaded_file is not None:
     st.sidebar.markdown("""
 <div style="padding:4px 0 8px 0;">
   <div style="font-size:0.7rem;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;
-              color:#b3904a;margin-bottom:2px;">詳細設定</div>
+              color:#b3904a;margin-bottom:2px;">🔍 詳細設定</div>
   <div style="font-size:0.65rem;color:#66788a;">スクリーニング条件をカスタマイズ</div>
 </div>
 """, unsafe_allow_html=True)
@@ -912,7 +912,7 @@ if uploaded_file is not None:
 <div style="margin-top:14px;padding:8px 0 6px 0;
             border-top:1px solid rgba(179,144,74,0.2);">
   <div style="font-size:0.7rem;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;
-              color:#b3904a;margin-bottom:6px;">推定・最適化設定</div>
+              color:#b3904a;margin-bottom:6px;">🔬 推定・最適化設定</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1143,7 +1143,7 @@ if uploaded_file is not None:
         # [改善A3] キャッシュヒット時はタイトルにインジケータを表示
         _cache_hit = getattr(screener, '_stats_cache_hit', False)
         _cache_badge = " ⚡ 統計キャッシュ使用" if _cache_hit else ""
-        with st.expander(f"バケット別スクリーニング結果（クリックで詳細）{_cache_badge}", expanded=False):
+        with st.expander(f"🔍 バケット別スクリーニング結果（クリックで詳細）{_cache_badge}", expanded=False):
             st.markdown(
                 '<div style="font-size:0.75rem;color:#1e3a5f;font-weight:700;margin-bottom:8px;">'
                 f'事前フィルター通過: {_report["pre_filter_pool"]}本 → 最終選定: {_report["total_selected"]}本（コア除く）'
@@ -1415,7 +1415,7 @@ if uploaded_file is not None:
             f'<div style="background:#eff6ff;border:1px solid #93c5fd;'
             f'border-left:4px solid #1d4ed8;border-radius:6px;'
             f'padding:8px 14px;font-size:0.8rem;color:#1e3a8a;margin-bottom:8px;">'
-            f'<b>Ledoit-Wolf収縮共分散推定量を使用中</b>　'
+            f'🔬 <b>Ledoit-Wolf収縮共分散推定量を使用中</b>　'
             f'収縮係数: <b>{analyzer._cov_shrinkage:.4f}</b>　'
             f'（0に近いほど生データに近い、1に近いほど強く収縮）　'
             f'サイドバーのチェックを外すと生データ版（説明性重視）に切り替わります。'
@@ -1509,7 +1509,7 @@ if uploaded_file is not None:
     )
 
     # 詳細分析セクション（外側：プロファイルタブ）
-    st.markdown('<div class="section-header">プロファイル別 詳細分析</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">🔍 プロファイル別 詳細分析</div>', unsafe_allow_html=True)
 
     # 標準5プロファイルのみを外側タブの基本セットとする
     # テールリスク最小型は portfolios dict に含まれているが、
@@ -1647,6 +1647,7 @@ if uploaded_file is not None:
         comparison_df=comparison_df,
         allocation_df_numeric=allocation_df_numeric,
         fund_stats=fund_stats,
+        period_months=months,
     )
 
     # ─── 免責事項 ─────────────────────────────────────────────
