@@ -1,5 +1,12 @@
 """
-ポートフォリオ最適化 - ユーティリティ関数（改善版 v3.3.0）
+ポートフォリオ最適化 - ユーティリティ関数（改善版 v3.4.0）
+
+改善内容（v3.4.0 — ステージ1リファクタ 2026-03）:
+✅ [S1-02] calculate_fund_metrics() をモジュールレベルで新規追加
+   - portfolio_charts.py にネスト定義されていた calc_metrics() を本ファイルに昇格
+   - 計算基準（シャープ・MDD先頭1.0付加・ddof=1・Martin比率CAGR分子）は
+     FundScreener._calculate_statistics() と完全統一を維持
+   - charts 層は `from portfolio_utils import calculate_fund_metrics` で参照
 
 改善内容（v3.3.0 — 提案E〜H実装）:
 ✅ [改善E] Ledoit-Wolf収縮共分散推定量（use_ledoit_wolf フラグで切替可能）
@@ -1607,6 +1614,118 @@ class FundScreener:
             return self.statistics
         else:
             return self.statistics.loc[funds]
+
+
+def calculate_fund_metrics(
+    returns_series: pd.Series,
+    bench_returns_series: pd.Series = None,
+    risk_free_rate: float = 0.0,
+) -> dict:
+    """構成銘柄分析タブ用の定量指標を計算し、表示用整形済み文字列で返す。
+
+    portfolio_charts.py 内にネスト定義されていた calc_metrics() を
+    ステージ1リファクタ（2026-03）でモジュールレベルに昇格させたもの。
+    計算基準は FundScreener._calculate_statistics() と完全統一している。
+
+    Parameters
+    ----------
+    returns_series : pd.Series
+        月次リターン系列（dropna 済みを想定）。
+    bench_returns_series : pd.Series, optional
+        ベンチマークの月次リターン系列。相関係数計算に使用。
+    risk_free_rate : float
+        年率無リスク金利（デフォルト 0.0）。
+
+    Returns
+    -------
+    dict
+        表示用整形済み文字列を値とする辞書。
+        データが 12 本未満の場合はすべての値が np.nan（未整形）で返る。
+
+    Notes
+    -----
+    - シャープレシオ：算術平均ベース（FundScreener._calculate_statistics と統一）
+    - 最大ドローダウン：先頭 1.0 付加で期初損失を正確に捕捉（portfolio_utils 修正J と統一）
+    - ボラティリティ：ddof=1（FundScreener と統一）
+    - Martin 比率の分子：CAGR（幾何平均）ベース
+    - 出力値はすべて表示整形済み文字列（charts 層での再フォーマット不要）
+    """
+    if len(returns_series) < 12:
+        return {
+            "シャープレシオ": np.nan,
+            "価格変動リスク": np.nan,
+            "最大下落率":     np.nan,
+            "Omega比率":      np.nan,
+            "Ulcer指数":      np.nan,
+            "Martin比率":     np.nan,
+            "GL比率":         np.nan,
+            "相関性":         np.nan,
+        }
+
+    # ── リターン指標 ──────────────────────────────────────────
+    # 年率期待リターン（算術平均 - シャープ計算用：FundScreener と統一）
+    annual_return_arith = returns_series.mean() * 12
+    # 年率リターン（CAGR - Martin 比率計算用）
+    n_p   = len(returns_series)
+    cum_r = (1 + returns_series).prod() - 1
+    annual_return_geom = (1 + cum_r) ** (12 / n_p) - 1 if n_p > 0 else 0.0
+
+    # ── ボラティリティ・シャープ ──────────────────────────────
+    # ddof=1 を明示（FundScreener と統一）
+    annual_vol    = returns_series.std(ddof=1) * np.sqrt(12)
+    annual_excess = annual_return_arith - risk_free_rate
+    sharpe        = annual_excess / annual_vol if annual_vol > 0 else 0.0
+
+    # ── 最大ドローダウン ──────────────────────────────────────
+    # 先頭 1.0 付加：観測開始前を基準高値とみなし、期初の下落を捕捉する
+    # （portfolio_utils PortfolioAnalyzer.calculate_portfolio_stats 修正J と統一）
+    _cum_np  = np.concatenate([[1.0], (1 + returns_series.values).cumprod()])
+    _rmax_np = np.maximum.accumulate(_cum_np)
+    _dd_arr  = (_cum_np - _rmax_np) / _rmax_np
+    drawdown = pd.Series(_dd_arr[1:], index=returns_series.index)
+    max_dd   = float(_dd_arr[1:].min()) * 100  # 表示用 % スケール
+
+    # ── Omega 比率 ────────────────────────────────────────────
+    tau   = 0.0
+    pos   = np.maximum(returns_series - tau, 0).sum()
+    neg   = np.maximum(tau - returns_series, 0).sum()
+    omega = min(pos / neg, 99.99) if neg > 1e-8 else (99.99 if pos > 0 else 0.0)
+
+    # ── Ulcer 指数・Martin 比率 ───────────────────────────────
+    ulcer  = float(np.sqrt(np.mean(drawdown ** 2)))
+    martin = (annual_return_geom / ulcer) if ulcer > 1e-8 else (
+        99.99 if annual_return_geom > 0 else 0.0
+    )
+    martin = min(max(martin, -99.99), 99.99)
+
+    # ── GL 比率（Gain/Loss 比率）─────────────────────────────
+    wins     = returns_series[returns_series > 0]
+    losses   = returns_series[returns_series < 0]
+    avg_gain = wins.mean()        if len(wins)   > 0 else 0.0
+    avg_loss = abs(losses.mean()) if len(losses) > 0 else 1e-8
+    gl_ratio = min(avg_gain / avg_loss, 99.99) if avg_loss > 1e-8 and avg_gain > 0 else (
+        99.99 if avg_gain > 0 else 0.0
+    )
+
+    # ── ベンチマーク相関 ──────────────────────────────────────
+    correlation = np.nan
+    if bench_returns_series is not None and len(bench_returns_series) >= 12:
+        common_idx = returns_series.index.intersection(bench_returns_series.index)
+        if len(common_idx) >= 12:
+            correlation = returns_series.loc[common_idx].corr(
+                bench_returns_series.loc[common_idx]
+            )
+
+    return {
+        "シャープレシオ": f"{sharpe:.2f}",
+        "価格変動リスク": f"{annual_vol * 100:.1f}%",
+        "最大下落率":     f"{max_dd:.1f}%",
+        "Omega比率":      f"{omega:.2f}",
+        "Ulcer指数":      f"{ulcer * 100:.2f}%",
+        "Martin比率":     f"{martin:.2f}",
+        "GL比率":         f"{gl_ratio:.2f}",
+        "相関性":         f"{correlation:.2f}" if not np.isnan(correlation) else "N/A",
+    }
 
 
 def export_results_to_excel(portfolios: Dict, 
