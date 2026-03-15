@@ -1418,6 +1418,8 @@ if uploaded_file is not None:
         returns_selected=returns_selected,
         rf_rate=rf_rate,
         show_rp=_show_rp,
+        overview_raw=overview_raw,
+        use_lw=_use_lw,
     )
 
     # 詳細分析セクション（外側：プロファイルタブ）
