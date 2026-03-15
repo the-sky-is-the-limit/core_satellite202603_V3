@@ -21,6 +21,8 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+from portfolio_charts import _donut_svg, _badge
+from portfolio_utils import PortfolioAnalyzer
 
 # ── デザインシステム定数 ───────────────────────────────────────
 _PROFILE_META = {
