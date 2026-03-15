@@ -1407,8 +1407,8 @@ if uploaded_file is not None:
     # comparison_df / _comparison_col_cfg を ctx から取り出す
     comparison_df         = _report_ctx["comparison_df"]
 
-    # render_report_panel は allocation_df_numeric を返す
-    allocation_df_numeric = render_report_panel(
+    # render_report_panel は (allocation_df_numeric, period_start, period_end, period_months) を返す
+    allocation_df_numeric, _period_start, _period_end, _period_months = render_report_panel(
         ctx=_report_ctx,
         portfolios=portfolios,
         selected_funds=selected_funds,
