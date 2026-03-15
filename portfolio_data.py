@@ -158,9 +158,20 @@ def compute_fund_overview_table(
         r_all = cagr(ret, n)        # 設定来
 
         # ── 設定来リスク指標 ────────────────────────────────────
-        vol    = ret.std(ddof=1) * np.sqrt(12)
-        # 無リスク金利を控除したシャープレシオ（rf_rate=0.0 のときは従来と同値）
-        sharpe = ((r_all - rf_rate) / vol) if (r_all is not None and vol > 1e-6) else None
+        vol = ret.std(ddof=1) * np.sqrt(12)
+
+        # [BUG-G修正] シャープレシオを算術平均ベースに統一。
+        # 旧実装は r_all（CAGR）を分子に使っていたが、
+        # FundScreener._calculate_statistics() / PortfolioAnalyzer.calculate_portfolio_stats() /
+        # calculate_fund_metrics() はすべて算術平均（ret.mean() * 12）を使用している。
+        # 長期・高ボラ環境では CAGR < 算術平均 になるため、旧実装では概観テーブルの
+        # シャープレシオだけが他の画面より系統的に低く表示されていた。
+        # 修正後：ret.mean() * 12（年率算術平均）を分子に使うことで定義を統一する。
+        annual_return_arith = ret.mean() * 12
+        sharpe = (
+            (annual_return_arith - rf_rate) / vol
+            if vol > 1e-6 else None
+        )
 
         # 最大 DD：先頭に 1.0 を付加して期初損失を正確に捕捉
         # （_calculate_statistics と統一。旧実装 cum_ret.cummax() は
