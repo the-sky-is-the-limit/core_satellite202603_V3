@@ -204,11 +204,6 @@ def _render_client_view(
     .rc .lbl{{font-size:11px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;font-weight:600;}}
     .rc .val{{font-family:'Inter',sans-serif;font-size:18px;font-weight:700;letter-spacing:-0.01em;}}
     .rc .note{{font-size:11px;color:#334155;margin-top:4px;line-height:1.5;}}
-    .disc-box{{margin:0 20px;background:rgba(122,92,30,0.04);border:1px solid rgba(122,92,30,0.16);
-      border-radius:9px;padding:16px 18px;}}
-    .disc-box h4{{font-size:11px;color:#7A5C1E;letter-spacing:0.08em;text-transform:uppercase;
-      margin-bottom:8px;display:flex;align-items:center;gap:5px;font-weight:700;}}
-    .disc-box p{{font-size:12px;color:#334155;line-height:1.9;margin-bottom:5px;}}
     .yearly-wrap{{padding:0 20px 14px;}}
     </style>
     </head>
@@ -300,12 +295,7 @@ def _render_client_view(
     <div class="chart-wrap" style="height:180px;"><canvas id="yearlyChart"></canvas></div>
       </div>
     </div>
-    <div class="disc-box">
-      <h4>⚖ 重要な注意事項</h4>
-      <p>本資料に掲載されているリターン・リスク指標はすべて<strong>過去の実績値</strong>であり、将来の運用成果を保証・約束するものでは一切ありません。記載の数値は手数料・税金を考慮していない場合があります。</p>
-      <p>外国籍ファンドへの投資は、為替リスク・カントリーリスク・流動性リスク等を含む各種リスクを伴います。最大ドローダウンは過去の損失最大値であり、今後さらに大きな損失が生じる可能性を否定するものではありません。</p>
-      <p>ヘッジファンドダイレクト株式会社は関東財務局長（金商）第532号の登録投資助言業者です。本資料は情報提供のみを目的としており、特定ファンドへの投資を勧誘・推奨するものではありません。</p>
-    </div>
+
     <script>
     (function(){{
       var dates={_dates_json};
