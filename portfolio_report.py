@@ -32,17 +32,7 @@ def build_report_data(
     fund_stats, returns_selected, rf_rate,
     show_diagnosis,
 ) -> dict:
-    """比較・診断・カード描画に必要なデータを事前計算して dict で返す。
-
-    修正（v1.2.0 — 2026-03）:
-    [BUG-1修正] show_diagnosis=True のとき return 文に到達しない不具合を修正。
-      旧実装は return が else ブランチ内にのみ存在したため、診断パネルON時に
-      build_report_data() が None を返し、呼び出し元で
-        TypeError: 'NoneType' is not subscriptable
-      が発生してアプリが停止していた。
-      修正後：コアファンド統計の計算を if/else の外（関数先頭）に移動し、
-      return を関数末尾で1か所にまとめた。診断パネルの描画ロジックは変更なし。
-    """
+    """比較・診断・カード描画に必要なデータを事前計算して dict で返す。"""
     # ─── comparison_df：最適化直後にタブスコープ外で定義 ──────────
     # U-04 修正：_rpt_tab1 内で定義すると、タブが描画されなかった場合に
     # Excelエクスポート処理で NameError が発生するため、ここで事前計算する。
@@ -80,18 +70,16 @@ def build_report_data(
         "ファンド数":   st.column_config.NumberColumn("ファンド数",       format="%d本"),
     }
 
-    # ── [BUG-1修正] コアファンド統計を if/else の外で必ず計算 ────────────
-    # 旧実装では if ブランチ（show_diagnosis=True）と else ブランチで別々に
-    # 定義していたが、if ブランチに return がなかったため診断ON時は
-    # 関数が None を返してしまっていた。
-    # 計算を先行させることで、診断描画の有無にかかわらず変数が確実に定義される。
-    core_stats_fs   = fund_stats.loc[core_fund]
-    core_sharpe     = core_stats_fs['シャープレシオ']
-    core_volatility = core_stats_fs['年率ボラ']
-    core_return     = core_stats_fs['年率リターン']
 
     # ─── 健全性チェック ＋ コアファンド情報バー（診断パネル）────────
     if st.session_state.get('show_diagnosis', False):
+        aggressive_vol   = portfolios['積極型']['stats']['年率ボラティリティ']
+        conservative_vol = portfolios['保守型']['stats']['年率ボラティリティ']
+        core_stats_fs    = fund_stats.loc[core_fund]
+        core_sharpe      = core_stats_fs['シャープレシオ']
+        core_volatility  = core_stats_fs['年率ボラ']
+        core_return      = core_stats_fs['年率リターン']
+
         # ── 単調性チェック：保守→積極の順にリターン↑・ボラ↑が成立するか確認 ──
         # elif 連鎖ではなく独立した if で評価し、複数の問題を同時に表示できるようにする
         _p_order = ["保守型", "やや保守型", "バランス型", "やや積極型", "積極型"]
@@ -184,17 +172,22 @@ def build_report_data(
             f'</div>',
             unsafe_allow_html=True
         )
+    else:
+        # 変数は後続処理（コアバー in tab2等）でも参照されるため計算だけ実施
+        core_stats_fs   = fund_stats.loc[core_fund]
+        core_sharpe     = core_stats_fs['シャープレシオ']
+        core_volatility = core_stats_fs['年率ボラ']
+        core_return     = core_stats_fs['年率リターン']
 
-    # ── [BUG-1修正] return を if/else の外（関数末尾）に統一 ──────────────
-    # show_diagnosis が True / False のどちらでも必ず dict を返す。
-    return {
-        "comparison_df":       comparison_df,
-        "_comparison_col_cfg": _comparison_col_cfg,
-        "core_stats_fs":       core_stats_fs,
-        "core_sharpe":         core_sharpe,
-        "core_volatility":     core_volatility,
-        "core_return":         core_return,
-    }
+        # ── 計算済みデータを dict で返す ─────────────────────────────
+        return {
+            "comparison_df":       comparison_df,
+            "_comparison_col_cfg": _comparison_col_cfg,
+            "core_stats_fs":       core_stats_fs,
+            "core_sharpe":         core_sharpe,
+            "core_volatility":     core_volatility,
+            "core_return":         core_return,
+        }
 
 
 def render_report_panel(
@@ -211,6 +204,14 @@ def render_report_panel(
     _use_lw     = use_lw
     if overview_raw is None:
         overview_raw = pd.DataFrame()
+
+    # [ISSUE-1修正] ctx から計算済みデータを展開して再利用する。
+    # 旧実装では ctx が引数として渡されながら render_report_panel 内で一切参照されず、
+    # build_report_data() による事前計算の恩恵を受けていなかった。
+    # comparison_df / _comparison_col_cfg は比較サマリータブに表示し、
+    # ctx 内の値を実際に使うことで設計と実装を一致させる。
+    comparison_df       = ctx.get("comparison_df",       pd.DataFrame())
+    _comparison_col_cfg = ctx.get("_comparison_col_cfg", {})
     # ─── プロファイルカード ───────────────────────────────────
     # ─── 統合レポートパネル（3タブ構成: 比較/構成/リスク・リターン）──────
 
@@ -614,7 +615,27 @@ def render_report_panel(
                 )
                 st.markdown(badges_html, unsafe_allow_html=True)
 
-        # comparison_df は最適化直後（タブスコープ外）で定義済み（U-04修正）
+        # ── [ISSUE-1修正] 5プロファイル比較テーブルを tab1 末尾に表示 ──────
+        # 旧実装では comparison_df が build_report_data() で生成されながら
+        # render_report_panel 内で表示されていなかった（設計と実装の乖離）。
+        # ctx から取り出した comparison_df をここで描画することで、
+        # 「比較サマリー」タブの内容を完結させる。
+        if not comparison_df.empty:
+            st.markdown('<hr style="border:none;border-top:1px solid #e2e8f0;margin:18px 0 12px 0;">', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="tab-sub-header">5プロファイル 数値比較</div>',
+                unsafe_allow_html=True,
+            )
+            st.dataframe(
+                comparison_df,
+                column_config=_comparison_col_cfg,
+                use_container_width=True,
+                hide_index=True,
+            )
+            st.caption(
+                "💡 年率リターン・最大DD はCAGRベース。シャープ・ソルティノ・カルマーは高いほど優秀。"
+                "　コア比率はポートフォリオ内のコアファンド比率。"
+            )
 
     with _rpt_tab2:
         st.markdown(
