@@ -647,7 +647,7 @@ st.markdown("""
       <span style="background:linear-gradient(135deg,#b3904a,#8a6a30);color:#0f172a;
                    border-radius:4px;padding:2px 8px;font-size:0.65rem;font-weight:800;
                    letter-spacing:0.08em;flex-shrink:0;">STEP 3</span>
-      <span style="font-size:0.78rem;font-weight:700;color:#1e3a5f;">🚀 分析実行</span>
+      <span style="font-size:0.78rem;font-weight:700;color:#1e3a5f;">分析実行</span>
     </div>
     <div style="font-size:0.65rem;color:#66788a;margin-top:3px;">最適化 → 5段階プロファイル生成</div>
   </div>
@@ -845,7 +845,7 @@ if uploaded_file is not None:
 </div><!-- /settings-panel-body -->
 """, unsafe_allow_html=True)
 
-    run_button = st.button("🚀　分析実行　— ポートフォリオ最適化を開始", type="primary", use_container_width=True)
+    run_button = st.button("分析実行　— ポートフォリオ最適化を開始", type="primary", use_container_width=True)
 
     st.markdown("""
 <div style="font-size:0.65rem;color:rgba(255,255,255,0.3);text-align:center;margin-top:6px;margin-bottom:4px;">
@@ -910,7 +910,7 @@ if uploaded_file is not None:
 <div style="margin-top:14px;padding:8px 0 6px 0;
             border-top:1px solid rgba(179,144,74,0.2);">
   <div style="font-size:0.7rem;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;
-              color:#b3904a;margin-bottom:6px;">🔬 推定・最適化設定</div>
+              color:#b3904a;margin-bottom:6px;">推定・最適化設定</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1410,7 +1410,7 @@ if uploaded_file is not None:
             f'<div style="background:#eff6ff;border:1px solid #93c5fd;'
             f'border-left:4px solid #1d4ed8;border-radius:6px;'
             f'padding:8px 14px;font-size:0.8rem;color:#1e3a8a;margin-bottom:8px;">'
-            f'🔬 <b>Ledoit-Wolf収縮共分散推定量を使用中</b>　'
+            f'<b>Ledoit-Wolf収縮共分散推定量を使用中</b>　'
             f'収縮係数: <b>{analyzer._cov_shrinkage:.4f}</b>　'
             f'（0に近いほど生データに近い、1に近いほど強く収縮）　'
             f'サイドバーのチェックを外すと生データ版（説明性重視）に切り替わります。'
