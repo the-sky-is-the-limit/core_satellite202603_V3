@@ -912,7 +912,7 @@ if uploaded_file is not None:
 <div style="margin-top:14px;padding:8px 0 6px 0;
             border-top:1px solid rgba(179,144,74,0.2);">
   <div style="font-size:0.7rem;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;
-              color:#b3904a;margin-bottom:6px;">🔬 推定・最適化設定</div>
+              color:#b3904a;margin-bottom:6px;">推定・最適化設定</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1415,7 +1415,7 @@ if uploaded_file is not None:
             f'<div style="background:#eff6ff;border:1px solid #93c5fd;'
             f'border-left:4px solid #1d4ed8;border-radius:6px;'
             f'padding:8px 14px;font-size:0.8rem;color:#1e3a8a;margin-bottom:8px;">'
-            f'🔬 <b>Ledoit-Wolf収縮共分散推定量を使用中</b>　'
+            f'<b>Ledoit-Wolf収縮共分散推定量を使用中</b>　'
             f'収縮係数: <b>{analyzer._cov_shrinkage:.4f}</b>　'
             f'（0に近いほど生データに近い、1に近いほど強く収縮）　'
             f'サイドバーのチェックを外すと生データ版（説明性重視）に切り替わります。'
