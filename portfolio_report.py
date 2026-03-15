@@ -959,7 +959,7 @@ def render_report_panel(
                 フロンティア内部でサンプル共分散を使用するため use_ledoit_wolf 引数は不要。
                 """
                 _az = PortfolioAnalyzer(_rets, risk_free_rate=_rf, use_ledoit_wolf=False)
-                return _az.calculate_efficient_frontier(n_points=35)
+                return _az.calculate_efficient_frontier(n_points=25)
 
             try:
                 _ef_hash = hashlib.sha256(
