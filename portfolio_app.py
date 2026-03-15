@@ -9,7 +9,7 @@ import numpy as np
 # _donut_svg / _badge は portfolio_report.py で import・使用されており
 # portfolio_app.py での直接参照はない。
 from portfolio_utils import PortfolioAnalyzer, FundScreener
-from portfolio_charts import render_profile_detail
+from portfolio_charts import render_profile_detail, render_fund_drill_section
 from portfolio_data import (
     load_fund_data,
     compute_fund_overview_table,
@@ -23,7 +23,9 @@ from portfolio_report import (
     build_report_data,
     render_report_panel,
     render_export_section,
+    compute_rp_portfolio,
 )
+import io
 import hashlib
 import json
 import time
@@ -930,18 +932,21 @@ if uploaded_file is not None:
         ),
     )
 
-    # [改善F] リスクパリティ配分の表示切替
-    # コアウェイト制約を維持したまま、サテライト部分の
-    # リスク寄与（Risk Contribution）を均等化する配分戦略。
+    # [改善F] リスクパリティ & テールリスク最小型の表示切替
+    # チェックボックスひとつで両方を同時に表示/非表示する。
     _show_rp = st.sidebar.checkbox(
-        "リスクパリティ配分を表示",
+        "リスクパリティ / テールリスク最小型を表示",
         value=False,
         key="show_risk_parity",
         help=(
+            "【リスクパリティ】\n"
             "バランス型のコア比率（50〜65%）を維持したまま、\n"
             "サテライト各ファンドのリスク寄与を均等化した配分を追加表示します。\n\n"
-            "名目ウェイト（保有比率）ではなく「リスクの分散」を\n"
-            "最大化したい場合の参考に使用してください。"
+            "【テールリスク最小型】\n"
+            "CVaR（ワースト5%月の平均損失）を直接最小化したプロファイルです。\n"
+            "正規分布を前提としないため、ファットテール・左歪み分布の\n"
+            "ヘッジファンドを正しく評価できます。\n"
+            "超保守クライアント向けの参考プロファイルとしてご活用ください。"
         ),
     )
 
@@ -1410,7 +1415,7 @@ if uploaded_file is not None:
             f'<div style="background:#eff6ff;border:1px solid #93c5fd;'
             f'border-left:4px solid #1d4ed8;border-radius:6px;'
             f'padding:8px 14px;font-size:0.8rem;color:#1e3a8a;margin-bottom:8px;">'
-            f'<b>Ledoit-Wolf収縮共分散推定量を使用中</b>　'
+            f'　<b>Ledoit-Wolf収縮共分散推定量を使用中</b>　'
             f'収縮係数: <b>{analyzer._cov_shrinkage:.4f}</b>　'
             f'（0に近いほど生データに近い、1に近いほど強く収縮）　'
             f'サイドバーのチェックを外すと生データ版（説明性重視）に切り替わります。'
@@ -1447,6 +1452,27 @@ if uploaded_file is not None:
             unsafe_allow_html=True,
         )
 
+    # ─── [改善F] リスクパリティ & テールリスク最小型を事前計算（チェックON時のみ）──
+    # キャッシュ済みの compute_rp_portfolio を使用するため、チェックボックスONでも
+    # 2回目以降の実行ではほぼ瞬時に完了する。
+    _rp_result   = None
+    _tr_portfolio = portfolios.get("テールリスク最小型", None)   # optimization_configs に常に含まれる
+    if _show_rp:
+        try:
+            _ret_hash = hashlib.sha256(
+                pd.util.hash_pandas_object(returns_selected, index=True).values.tobytes()
+            ).hexdigest()[:16]
+            _rp_result = compute_rp_portfolio(
+                returns_selected,
+                tuple(selected_funds),
+                core_fund,
+                _use_lw,
+                rf_rate,
+                _ret_hash,
+            )
+        except Exception as _rp_pre_err:
+            st.warning(f"⚠️ リスクパリティ事前計算に失敗しました: {_rp_pre_err}")
+
     # ─── レポートデータ事前計算 ＋ 統合レポートパネル ────────────
     # （build_report_data / render_report_panel は portfolio_report で管理）
     _report_ctx = build_report_data(
@@ -1458,6 +1484,9 @@ if uploaded_file is not None:
         returns_selected=returns_selected,
         rf_rate=rf_rate,
         show_diagnosis=st.session_state.get("show_diagnosis", False),
+        show_rp=_show_rp,
+        rp_result=_rp_result,
+        tr_portfolio=_tr_portfolio,
     )
     # comparison_df / _comparison_col_cfg を ctx から取り出す
     comparison_df         = _report_ctx["comparison_df"]
@@ -1475,28 +1504,49 @@ if uploaded_file is not None:
         show_rp=_show_rp,
         overview_raw=overview_raw,
         use_lw=_use_lw,
+        rp_result=_rp_result,
+        tr_portfolio=_tr_portfolio,
     )
 
     # 詳細分析セクション（外側：プロファイルタブ）
     st.markdown('<div class="section-header">🔍 プロファイル別 詳細分析</div>', unsafe_allow_html=True)
 
-    available_profiles = list(portfolios.keys())
-    if not available_profiles:
+    # 標準5プロファイルのみを外側タブの基本セットとする
+    # テールリスク最小型は portfolios dict に含まれているが、
+    # チェックOFF時は外側タブに表示しない（比較サマリーにも出さない）
+    _standard_5 = ["積極型", "やや積極型", "バランス型", "やや保守型", "保守型"]
+    available_profiles = [p for p in _standard_5 if p in portfolios]
+
+    # チェックON時: リスクパリティ & テールリスク最小型タブを追加
+    # RP は portfolios dict には入っていないので、擬似的な dict エントリを用意する
+    _extra_profiles = []  # (profile_name, weights, stats) のリスト
+    if _show_rp:
+        if _rp_result is not None:
+            _rp_w, _rp_st, _ = _rp_result
+            _extra_profiles.append(("リスクパリティ", _rp_w, _rp_st))
+        if _tr_portfolio is not None:
+            _extra_profiles.append(("テールリスク最小型", _tr_portfolio["weights"], _tr_portfolio["stats"]))
+
+    if not available_profiles and not _extra_profiles:
         st.error("ポートフォリオの生成に失敗しました。パラメータを調整してください。")
         st.stop()
 
     _profile_label = {
-        "積極型":           "🔴 積極型",
-        "やや積極型":       "🟠 やや積極型",
-        "バランス型":       "🟡 バランス型",
-        "やや保守型":       "🟢 やや保守型",
-        "保守型":           "🔵 保守型",
-        "テールリスク最小型": "🟣 テールリスク最小型",  # [Bug-A修正] 絵文字ラベルを追加
+        "積極型":         "🔴 積極型",
+        "やや積極型":     "🟠 やや積極型",
+        "バランス型":     "🟡 バランス型",
+        "やや保守型":     "🟢 やや保守型",
+        "保守型":         "🔵 保守型",
+        "リスクパリティ": "⚖️ リスクパリティ",
+        "テールリスク最小型": "🛡 テールリスク最小型",
     }
 
-    _outer_tabs = st.tabs([_profile_label.get(p, p) for p in available_profiles])
+    # 全タブ名一覧（標準5 + 追加分）
+    _all_tab_profiles   = available_profiles + [ep[0] for ep in _extra_profiles]
+    _outer_tabs = st.tabs([_profile_label.get(p, p) for p in _all_tab_profiles])
 
-    for _outer_tab, _profile_name in zip(_outer_tabs, available_profiles):
+    # 標準5プロファイルのタブ描画
+    for _outer_tab, _profile_name in zip(_outer_tabs[:len(available_profiles)], available_profiles):
         with _outer_tab:
             try:
                 _w = portfolios[_profile_name]["weights"]
@@ -1526,6 +1576,69 @@ if uploaded_file is not None:
             except Exception as _e:
                 st.error(f"ポートフォリオデータの取得に失敗: {_e}")
 
+            # ── 📊 構成ファンド 個別分析（このプロファイルタブに連動）──
+            # render_profile_detail の直後・同一タブ内に配置することで、
+            # 外側タブ切替と構成ファンド表示を完全に連動させる。
+            # Streamlit タブには選択コールバックがないため、
+            # タブの外に1回だけ呼ぶ方式では連動できない。
+            render_fund_drill_section(
+                portfolios       = portfolios,
+                selected_funds   = selected_funds,
+                returns_selected = returns_selected,
+                core_fund        = core_fund,
+                core_idx         = core_idx,
+                df_filtered      = df_filtered,
+                fund_stats       = fund_stats,
+                period_start     = _period_start,
+                period_end       = _period_end,
+                period_months    = _period_months,
+                profile_name     = _profile_name,   # タブ名を直接指定
+            )
+
+    # リスクパリティ & テールリスク最小型のタブ描画（チェックON時のみ）
+    for _outer_tab, (_ep_name, _ep_w, _ep_st) in zip(
+        _outer_tabs[len(available_profiles):], _extra_profiles
+    ):
+        with _outer_tab:
+            try:
+                if not isinstance(_ep_w, np.ndarray):
+                    _ep_w = np.array(_ep_w)
+                if _ep_w.shape[0] != len(selected_funds):
+                    st.error(f"ポートフォリオの次元が不正: {_ep_w.shape[0]} != {len(selected_funds)}")
+                    continue
+                # portfolios dict に擬似エントリを追加して render_profile_detail に渡す
+                _ep_portfolios_ext = dict(portfolios)
+                _ep_cfg = {
+                    "core_range": (0.50, 0.65) if _ep_name == "リスクパリティ" else (0.70, 0.85),
+                    "max_individual": 0.20,
+                    "objective": "risk_parity" if _ep_name == "リスクパリティ" else "min_cvar",
+                    "color": "#6366f1" if _ep_name == "リスクパリティ" else "#553c9a",
+                }
+                _ep_portfolios_ext[_ep_name] = {
+                    "weights": _ep_w,
+                    "stats":   _ep_st,
+                    "config":  _ep_cfg,
+                }
+                render_profile_detail(
+                    _ep_name, _ep_w, _ep_st,
+                    returns_selected=returns_selected,
+                    selected_funds=selected_funds,
+                    df_filtered=df_filtered,
+                    df_price=df_price,
+                    benchmark=benchmark,
+                    core_fund=core_fund,
+                    core_idx=core_idx,
+                    fund_stats=fund_stats,
+                    df_returns=df_returns,
+                    portfolios=_ep_portfolios_ext,
+                    period_start=_period_start,
+                    period_end=_period_end,
+                    period_months=_period_months,
+                    analyzer=analyzer,
+                )
+            except Exception as _e:
+                st.error(f"{_ep_name}の詳細分析に失敗: {_e}")
+
     # ─── エクスポート機能 ─────────────────────────────────────────
     # （render_export_section は portfolio_report で管理）
     render_export_section(
@@ -1534,19 +1647,20 @@ if uploaded_file is not None:
         comparison_df=comparison_df,
         allocation_df_numeric=allocation_df_numeric,
         fund_stats=fund_stats,
+        period_months=months,
     )
 
     # ─── 免責事項 ─────────────────────────────────────────────
     st.markdown(
         '<div class="disclaimer">'
-        '【留意事項】'
+        '【留意事項】本資料は情報提供を目的として作成したものであり、特定の投資信託の購入・売却を勧誘するものではありません。'
         '本資料に掲載されているリターン・リスク指標はすべて過去の実績値であり、将来の運用成果を保証・約束するものでは一切ありません。'
         '記載の数値は手数料・税金を考慮していない場合があります。'
-        '　外国籍ファンドへの投資は、為替リスク・カントリーリスク・流動性リスク等を含む各種リスクを伴います。'
+        '過去の運用実績は将来の成果を保証するものではありません。'
+        '投資信託は値動きのある有価証券等に投資しますので、基準価格が変動し、投資元本を割り込むことがあります。'
+        '外国籍ファンドへの投資は、為替リスク・カントリーリスク・流動性リスク等を含む各種リスクを伴います。'
         '最大ドローダウンは過去の損失最大値であり、今後さらに大きな損失が生じる可能性を否定するものではありません。'
-        '　投資信託は値動きのある有価証券等に投資しますので、基準価格が変動し、投資元本を割り込むことがあります。'
-        '　ヘッジファンドダイレクト株式会社は関東財務局長（金商）第532号の登録投資助言業者です。'
-        '本資料は情報提供のみを目的として作成したものであり、特定ファンドへの投資を勧誘・推奨するものではありません。'
+        '　ヘッジファンドダイレクト株式会社　関東財務局長（金商）第532号'
         '</div>',
         unsafe_allow_html=True
     )
