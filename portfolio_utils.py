@@ -607,7 +607,10 @@ class PortfolioAnalyzer:
                 else:
                     # コアでも調整不可能な場合は、可能な範囲で調整
                     # （このケースは可行性チェックで事前に弾かれるはず）
-                    print(f"Warning: Unable to project to feasible simplex. Delta={delta:.6f}")
+                    warnings.warn(
+                        f"Unable to project to feasible simplex. Delta={delta:.6f}",
+                        RuntimeWarning, stacklevel=3
+                    )
         
         # 5. 最終的なboundsチェック（念のため）
         w_proj[~active] = 0
@@ -669,7 +672,11 @@ class PortfolioAnalyzer:
                     # 3) 最終チェック
                     total4 = w_proj.sum()
                     if abs(total4 - 1.0) > 1e-6:
-                        print(f"Warning: Post-clip renormalization failed. sum={total4:.8f}, delta={1.0-total4:.8f}")
+                        warnings.warn(
+                            f"Post-clip renormalization failed. sum={total4:.8f}, "
+                            f"delta={1.0-total4:.8f}",
+                            RuntimeWarning, stacklevel=3
+                        )
                 # --- 追加ここまで ---
         
         return w_proj
