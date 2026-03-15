@@ -32,7 +32,17 @@ def build_report_data(
     fund_stats, returns_selected, rf_rate,
     show_diagnosis,
 ) -> dict:
-    """比較・診断・カード描画に必要なデータを事前計算して dict で返す。"""
+    """比較・診断・カード描画に必要なデータを事前計算して dict で返す。
+
+    修正（v1.2.0 — 2026-03）:
+    [BUG-1修正] show_diagnosis=True のとき return 文に到達しない不具合を修正。
+      旧実装は return が else ブランチ内にのみ存在したため、診断パネルON時に
+      build_report_data() が None を返し、呼び出し元で
+        TypeError: 'NoneType' is not subscriptable
+      が発生してアプリが停止していた。
+      修正後：コアファンド統計の計算を if/else の外（関数先頭）に移動し、
+      return を関数末尾で1か所にまとめた。診断パネルの描画ロジックは変更なし。
+    """
     # ─── comparison_df：最適化直後にタブスコープ外で定義 ──────────
     # U-04 修正：_rpt_tab1 内で定義すると、タブが描画されなかった場合に
     # Excelエクスポート処理で NameError が発生するため、ここで事前計算する。
@@ -70,16 +80,18 @@ def build_report_data(
         "ファンド数":   st.column_config.NumberColumn("ファンド数",       format="%d本"),
     }
 
+    # ── [BUG-1修正] コアファンド統計を if/else の外で必ず計算 ────────────
+    # 旧実装では if ブランチ（show_diagnosis=True）と else ブランチで別々に
+    # 定義していたが、if ブランチに return がなかったため診断ON時は
+    # 関数が None を返してしまっていた。
+    # 計算を先行させることで、診断描画の有無にかかわらず変数が確実に定義される。
+    core_stats_fs   = fund_stats.loc[core_fund]
+    core_sharpe     = core_stats_fs['シャープレシオ']
+    core_volatility = core_stats_fs['年率ボラ']
+    core_return     = core_stats_fs['年率リターン']
 
     # ─── 健全性チェック ＋ コアファンド情報バー（診断パネル）────────
     if st.session_state.get('show_diagnosis', False):
-        aggressive_vol   = portfolios['積極型']['stats']['年率ボラティリティ']
-        conservative_vol = portfolios['保守型']['stats']['年率ボラティリティ']
-        core_stats_fs    = fund_stats.loc[core_fund]
-        core_sharpe      = core_stats_fs['シャープレシオ']
-        core_volatility  = core_stats_fs['年率ボラ']
-        core_return      = core_stats_fs['年率リターン']
-
         # ── 単調性チェック：保守→積極の順にリターン↑・ボラ↑が成立するか確認 ──
         # elif 連鎖ではなく独立した if で評価し、複数の問題を同時に表示できるようにする
         _p_order = ["保守型", "やや保守型", "バランス型", "やや積極型", "積極型"]
@@ -172,22 +184,17 @@ def build_report_data(
             f'</div>',
             unsafe_allow_html=True
         )
-    else:
-        # 変数は後続処理（コアバー in tab2等）でも参照されるため計算だけ実施
-        core_stats_fs   = fund_stats.loc[core_fund]
-        core_sharpe     = core_stats_fs['シャープレシオ']
-        core_volatility = core_stats_fs['年率ボラ']
-        core_return     = core_stats_fs['年率リターン']
 
-        # ── 計算済みデータを dict で返す ─────────────────────────────
-        return {
-            "comparison_df":       comparison_df,
-            "_comparison_col_cfg": _comparison_col_cfg,
-            "core_stats_fs":       core_stats_fs,
-            "core_sharpe":         core_sharpe,
-            "core_volatility":     core_volatility,
-            "core_return":         core_return,
-        }
+    # ── [BUG-1修正] return を if/else の外（関数末尾）に統一 ──────────────
+    # show_diagnosis が True / False のどちらでも必ず dict を返す。
+    return {
+        "comparison_df":       comparison_df,
+        "_comparison_col_cfg": _comparison_col_cfg,
+        "core_stats_fs":       core_stats_fs,
+        "core_sharpe":         core_sharpe,
+        "core_volatility":     core_volatility,
+        "core_return":         core_return,
+    }
 
 
 def render_report_panel(
