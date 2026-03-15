@@ -73,8 +73,10 @@ def build_report_data(
 
     # ─── 健全性チェック ＋ コアファンド情報バー（診断パネル）────────
     if st.session_state.get('show_diagnosis', False):
-        aggressive_vol   = portfolios['積極型']['stats']['年率ボラティリティ']
-        conservative_vol = portfolios['保守型']['stats']['年率ボラティリティ']
+        # [ISSUE-6修正] aggressive_vol / conservative_vol を削除。
+        # BUG-1修正（2026-03）で if/else ブランチを整理した際、
+        # 単調性チェックが _vols リスト方式に変更されたにもかかわらず
+        # 旧実装の2変数定義だけが残留していた（一切参照されていないデッドコード）。
         core_stats_fs    = fund_stats.loc[core_fund]
         core_sharpe      = core_stats_fs['シャープレシオ']
         core_volatility  = core_stats_fs['年率ボラ']
