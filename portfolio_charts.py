@@ -300,12 +300,6 @@ def _render_client_view(
     <div class="chart-wrap" style="height:180px;"><canvas id="yearlyChart"></canvas></div>
       </div>
     </div>
-    <div class="disc-box">
-      <h4>⚖ 重要な注意事項</h4>
-      <p>本資料に掲載されているリターン・リスク指標はすべて<strong>過去の実績値</strong>であり、将来の運用成果を保証・約束するものでは一切ありません。記載の数値は手数料・税金を考慮していない場合があります。</p>
-      <p>外国籍ファンドへの投資は、為替リスク・カントリーリスク・流動性リスク等を含む各種リスクを伴います。最大ドローダウンは過去の損失最大値であり、今後さらに大きな損失が生じる可能性を否定するものではありません。</p>
-      <p>ヘッジファンドダイレクト株式会社は関東財務局長（金商）第532号の登録投資助言業者です。本資料は情報提供のみを目的としており、特定ファンドへの投資を勧誘・推奨するものではありません。</p>
-    </div>
     <script>
     (function(){{
       var dates={_dates_json};
@@ -368,7 +362,7 @@ def _render_client_view(
     </script>
     </body>
     </html>"""
-    _components.html(_client_html, height=1200, scrolling=True)
+    _components.html(_client_html, height=1100, scrolling=True)
 
 
 
@@ -426,7 +420,7 @@ def _render_tab_performance(
 
     # ベンチマーク
     if benchmark != "なし":
-        bench_returns = df_filtered[benchmark].pct_change(fill_method=None).dropna()
+        bench_returns = df_filtered[benchmark].pct_change().dropna()
         # iloc[-n:] でポートフォリオと期間を合わせ、indexを直接x軸に使用
         # (dropna後のindexをそのまま使うことで欠損値による日付ずれを防止)
         bench_slice = bench_returns.iloc[-len(port_returns):]
@@ -1012,7 +1006,7 @@ def _render_tab_constituents(
                 )
 
                 # リターン計算
-                fund_returns_full = fund_prices_full.pct_change(fill_method=None).dropna()
+                fund_returns_full = fund_prices_full.pct_change().dropna()
 
                 # リターン表作成
                 periods_dict = {
@@ -1031,7 +1025,7 @@ def _render_tab_constituents(
                     fund_ret = calc_annualized_return(fund_returns_full, period_months)
 
                     if benchmark != "なし":
-                        bench_returns_full = bench_prices_full.pct_change(fill_method=None).dropna()
+                        bench_returns_full = bench_prices_full.pct_change().dropna()
                         bench_ret = calc_annualized_return(bench_returns_full, period_months)
                     else:
                         bench_ret = np.nan
@@ -1046,23 +1040,16 @@ def _render_tab_constituents(
                 # 定量分析計算（calculate_fund_metrics は portfolio_utils で一元管理）
                 _rf = analyzer.risk_free_rate if analyzer is not None else 0.0
                 if benchmark != "なし":
-                    bench_returns_full = bench_prices_full.pct_change(fill_method=None).dropna()
+                    bench_returns_full = bench_prices_full.pct_change().dropna()
                     fund_metrics  = calculate_fund_metrics(fund_returns_full,  bench_returns_full, risk_free_rate=_rf)
                     bench_metrics = calculate_fund_metrics(bench_returns_full, risk_free_rate=_rf)
                 else:
                     fund_metrics  = calculate_fund_metrics(fund_returns_full, risk_free_rate=_rf)
                     bench_metrics = {
-                        "シャープレシオ": "N/A",
+                        "シャープレシオ": "N/A", 
                         "価格変動リスク": "N/A",
-                        "最大下落率":     "N/A",
-                        # [P4修正] 改善G・H で追加した4指標のキーが欠けており、
-                        # bench_metrics.get(key, "-") のデフォルト値 "-" が返されることで
-                        # 他の "N/A" と表示が混在していた。統一して "N/A" に揃える。
-                        "Omega比率":      "N/A",
-                        "Ulcer指数":      "N/A",
-                        "Martin比率":     "N/A",
-                        "GL比率":         "N/A",
-                        "相関性":         "N/A",
+                        "最大下落率": "N/A",
+                        "相関性": "N/A"
                     }
 
                 _bname = benchmark if benchmark != "なし" else "ベンチマーク"
@@ -1269,18 +1256,10 @@ def _render_fund_client_view(
     _dd_series   = (_cum_padded - _running_max) / _running_max
     _mdd         = float(_dd_series[1:].min()) * 100   # 先頭除去後
 
-    # ソルティノ（P2修正）
-    # 旧実装: _fund_ret_s[_fund_ret_s < 0] の平均でセミ偏差を計算
-    #   → 分母が「負の月数のみ」になり、勝率60%のファンドで約1.6倍の過大評価が発生。
-    # 新実装: Sortino & van der Meer (1991) 定義（τ=0, 全期間 T で除算）に統一。
-    #   FundScreener._calculate_statistics / PortfolioAnalyzer.calculate_portfolio_stats と同一定義。
-    _tau_sort    = 0.0   # 月次ハードル（無リスク金利なし）
-    _ds_sq       = np.minimum(_fund_ret_s.values - _tau_sort, 0) ** 2
-    _semi_dev    = float(np.sqrt(_ds_sq.mean()) * np.sqrt(12))
-    _ann_arith   = float(_fund_ret_s.mean() * 12)
-    _sortino     = min(_ann_arith / _semi_dev if _semi_dev > 1e-8 else (
-        10.0 if _ann_arith > 0 else 0.0
-    ), 10.0)
+    # ソルティノ
+    _down        = _fund_ret_s[_fund_ret_s < 0]
+    _semi_dev    = float(np.sqrt(np.mean(_down.values ** 2)) * (12 ** 0.5)) if len(_down) > 0 else 1e-8
+    _sortino     = min((_ann_ret / 100) / _semi_dev if _semi_dev > 1e-8 else 0.0, 10.0)
 
     # VaR / CVaR (95%, 月次)
     _k           = max(1, int(np.floor(_n * 0.05)))
@@ -1500,12 +1479,6 @@ body{{background:#F4F6F9;color:#1A2540;font-family:'Noto Sans JP',sans-serif;fon
   </div>
 </div>
 
-<div class="disc-box">
-  <h4>⚖ 重要な注意事項</h4>
-  <p>本資料に掲載されているリターン・リスク指標はすべて<strong>過去の実績値</strong>であり、将来の運用成果を保証・約束するものでは一切ありません。</p>
-  <p>ヘッジファンドダイレクト株式会社は関東財務局長（金商）第532号の登録投資助言業者です。本資料は情報提供のみを目的としており、特定ファンドへの投資を勧誘・推奨するものではありません。</p>
-</div>
-
 <script>
 (function(){{
   var dates={_dates_json};
@@ -1601,7 +1574,7 @@ body{{background:#F4F6F9;color:#1A2540;font-family:'Noto Sans JP',sans-serif;fon
 </body>
 </html>"""
 
-    _components.html(_html, height=1070, scrolling=True)
+    _components.html(_html, height=1020, scrolling=True)
 
 
 def render_fund_drill_section(
@@ -1732,7 +1705,7 @@ def render_profile_detail(
     col_mode_l, col_mode_r = st.columns([6, 1])
     with col_mode_r:
         if st.session_state["view_mode"] == "client":
-            if st.button("担当者モード", key=f"mode_btn_{selected_profile}", use_container_width=True):
+            if st.button("⚙️ 担当者モード", key=f"mode_btn_{selected_profile}", use_container_width=True):
                 st.session_state["view_mode"] = "advisor"
                 st.rerun()
         else:
