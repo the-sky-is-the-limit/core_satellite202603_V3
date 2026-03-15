@@ -206,7 +206,10 @@ def compute_fund_overview_table(
         idx_period   = ret.index.intersection(core_ret_period.index)
         corr_period  = (
             ret[idx_period].corr(core_ret_period[idx_period])
-            if len(idx_period) >= 6 else None
+            # [修正] 最小サンプルを 6 → 12 に変更。
+            # n=6 での相関係数は t検定で非有意（p≈0.31）のため信頼性が低い。
+            # n=12 で有意水準5%に近づくため、設定来相関の閾値（12ヶ月）と統一する。
+            if len(idx_period) >= 12 else None
         )
 
         # 相関安定性：12ヶ月ローリング相関の標準偏差
@@ -219,7 +222,10 @@ def compute_fund_overview_table(
                 .corr(core_ret_full[idx_full])
             )
             corr_stability = (
-                rolling_c.dropna().std(ddof=1)
+                # [修正] ddof=1 → ddof=0 に変更。
+                # FundScreener.calculate_correlations() は ddof=0 を使用しており、
+                # 同一指標が画面ごとに異なる値にならないよう統一する。
+                rolling_c.dropna().std(ddof=0)
                 if rolling_c.dropna().shape[0] >= 2 else None
             )
         else:
