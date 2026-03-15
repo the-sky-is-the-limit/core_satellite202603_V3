@@ -1,11 +1,15 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
-import plotly.express as px
-from datetime import datetime
+# [BUG-H修正] go / px / datetime / _donut_svg / _badge を削除。
+# ステージ1〜3リファクタでチャート描画・エクスポートを
+# portfolio_charts / portfolio_report に移管した際の残留インポート。
+# go / px はどの描画処理でも参照されていない。
+# datetime は render_export_section（portfolio_report）に移管済み。
+# _donut_svg / _badge は portfolio_report.py で import・使用されており
+# portfolio_app.py での直接参照はない。
 from portfolio_utils import PortfolioAnalyzer, FundScreener
-from portfolio_charts import render_profile_detail, _donut_svg, _badge
+from portfolio_charts import render_profile_detail
 from portfolio_data import (
     load_fund_data,
     compute_fund_overview_table,
@@ -804,22 +808,23 @@ if uploaded_file is not None:
     # ─────────────────────────────────────────────────────────────
     # 全ファンド概観テーブル（計算は常に実行・表示はサイドバーのチェックボックスで制御）
     # ─────────────────────────────────────────────────────────────
-    # [BUG-E修正] rf_rate スライダーをサマリーテーブル計算より前に配置することで
-    # キャッシュキーに「現在の」rf_rate を使用し、1 run 遅延を解消する。
-    # 旧実装は L807 で session_state から前回値を取得してキャッシュキーを生成し、
-    # L882 でサイドバーウィジェットの現在値を取得していたため、
-    # rf_rate 変更後の最初の run では古いキャッシュがヒットしていた。
-    # 修正後：スライダーを先に定義し rf_rate_annual を確定してからキャッシュキーを生成する。
-
-    # ── 無リスク金利設定（シャープレシオ計算に使用）── サマリー計算より前に配置 ──
-    # 現在の金利環境（日本国債・米国債）を踏まえてデフォルト0.5%に設定
-    with st.sidebar.expander("📐 シャープレシオ設定", expanded=False):
-        rf_rate_param = st.slider(
-            "無リスク金利（年率%）",
-            min_value=0.0, max_value=3.0, value=0.5, step=0.1,
-            help="シャープレシオ計算時に控除する無リスク金利。日本国債利回りを目安に設定してください（デフォルト：0.5%）"
-        )
-    rf_rate_annual = rf_rate_param / 100.0  # 小数に変換
+    # [BUG-E + ISSUE-7 統合修正]
+    # Streamlit の session_state key 早期読み取りパターンを使い、
+    # サイドバーの表示順序を保ちながら rf_rate の 1-run 遅延を解消する。
+    #
+    # Streamlit の動作原則:
+    #   key= 付きウィジェットの値はスクリプト開始時点で
+    #   session_state[key] に前回値として格納済みになる。
+    #   よって「ウィジェットの描画（st.slider）より前」に
+    #   session_state[key] を参照しても、前回のユーザー操作が反映された
+    #   「現在値」を取得できる。
+    #
+    # → rf_rate スライダーに key='_rf_rate_slider' を付与しておき、
+    #   キャッシュキー生成前に session_state から現在値を読む。
+    #   スライダー自体はサイドバー本来の位置（詳細設定の後）で描画する。
+    #   初回（key 未登録）はデフォルト 0.5% を使用。
+    _rf_rate_param_early = st.session_state.get('_rf_rate_slider', 0.5)
+    rf_rate_annual        = _rf_rate_param_early / 100.0
     st.session_state['rf_rate'] = rf_rate_annual
 
     with st.spinner("サマリーテーブルを計算中..."):
@@ -884,6 +889,20 @@ if uploaded_file is not None:
             '中高相関':     bq_midhi,
             '高相関':       bq_high,
         }
+
+    # ── 無リスク金利設定（シャープレシオ計算に使用）──────────────────
+    # key='_rf_rate_slider' を付与することで、スクリプト先頭での
+    # session_state 早期読み取りと同期する（ISSUE-7 / BUG-E 統合修正）。
+    # 現在の金利環境（日本国債・米国債）を踏まえてデフォルト0.5%に設定。
+    with st.sidebar.expander("📐 シャープレシオ設定", expanded=False):
+        rf_rate_param = st.slider(
+            "無リスク金利（年率%）",
+            min_value=0.0, max_value=3.0, value=0.5, step=0.1,
+            key='_rf_rate_slider',
+            help="シャープレシオ計算時に控除する無リスク金利。日本国債利回りを目安に設定してください（デフォルト：0.5%）"
+        )
+    rf_rate_annual = rf_rate_param / 100.0  # 小数に変換（以降の処理用に上書き）
+    st.session_state['rf_rate'] = rf_rate_annual
 
     # ── サイドバー：推定・最適化設定 ──────────────────────────────
     st.sidebar.markdown("""
