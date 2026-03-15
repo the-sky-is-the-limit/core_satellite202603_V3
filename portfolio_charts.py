@@ -34,7 +34,9 @@ import math
 from portfolio_utils import calculate_fund_metrics
 
 # ─── ヘルパー：ドーナツSVG ────────────────────────────────
-def _donut_svg(pct_val, color, size=72):
+# M-3: _donut_svg → donut_svg に昇格（portfolio_report.py からの import に備え公開 API 化）
+#      旧名は後方互換エイリアスとして残す。
+def donut_svg(pct_val, color, size=72):
     r = 26; cx = cy = 36; circ = 2 * math.pi * r
     arc = (pct_val / 100) * circ
     offset = circ / 4
@@ -49,8 +51,12 @@ def _donut_svg(pct_val, color, size=72):
         f'</svg>'
     )
 
+_donut_svg = donut_svg  # 後方互換エイリアス（直接呼び出し箇所が残る場合に備える）
+
 # ─── ヘルパー：メトリクスバッジHTML ──────────────────────
-def _badge(label, value, sub, accent):
+# M-3: _badge → badge に昇格（portfolio_report.py からの import に備え公開 API 化）
+#      旧名は後方互換エイリアスとして残す。
+def badge(label, value, sub, accent):
     return (
         f'<div class="metric-badge" style="border-top:3px solid {accent};">'
         f'<div class="metric-badge-label">{label}</div>'
@@ -58,6 +64,8 @@ def _badge(label, value, sub, accent):
         f'<div class="metric-badge-sub">{sub}</div>'
         f'</div>'
     )
+
+_badge = badge  # 後方互換エイリアス
 
 
 
