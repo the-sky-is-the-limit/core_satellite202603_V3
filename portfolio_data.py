@@ -341,19 +341,27 @@ def style_overview_table(
         "10年リターン(年率)", "設定来リターン(年率)", "最大DD(設定来)",
     ]
     pct_unsigned_cols = ["設定来ボラ", "月次勝率"]
+
+    # フォーマット関数をループ外で一度定義して再利用する。
+    # ループ内で毎回 lambda を生成すると同一の関数オブジェクトを列数分だけ
+    # メモリに確保するため、関数を共有することで無駄な割り当てを防ぐ。
+    _fmt_pct_signed   = lambda x: f"{x:+.1f}%" if pd.notna(x) else "—"
+    _fmt_pct_unsigned = lambda x: f"{x:.1f}%"  if pd.notna(x) else "—"
+    _fmt_2f           = lambda x: f"{x:.2f}"   if pd.notna(x) else "—"
+
     fmt = {}
     for col in pct_signed_cols:
         if col in df_disp.columns:
-            fmt[col] = lambda x: f"{x:+.1f}%" if pd.notna(x) else "—"
+            fmt[col] = _fmt_pct_signed
     for col in pct_unsigned_cols:
         if col in df_disp.columns:
-            fmt[col] = lambda x: f"{x:.1f}%" if pd.notna(x) else "—"
+            fmt[col] = _fmt_pct_unsigned
     for col in ["シャープ(設定来)", "データ期間(年)"]:
         if col in df_disp.columns:
-            fmt[col] = lambda x: f"{x:.2f}" if pd.notna(x) else "—"
+            fmt[col] = _fmt_2f
     corr_cols = [c for c in df_disp.columns if "コア相関" in c or "相関安定性" in c]
     for col in corr_cols:
-        fmt[col] = lambda x: f"{x:.2f}" if pd.notna(x) else "—"
+        fmt[col] = _fmt_2f
 
     def row_style(row):
         name = row.name
