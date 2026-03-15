@@ -372,183 +372,183 @@ def _render_tab_performance(
     constituent_funds,
 ):
     """Tab1：パフォーマンス推移・累積リターン・個別ファンド比較。"""
-st.markdown(f"### {selected_profile} - パフォーマンス詳細")
+    st.markdown(f"### {selected_profile} - パフォーマンス詳細")
 
-# パフォーマンスメトリクス
-col1, col2, col3, col4, col5 = st.columns(5)
+    # パフォーマンスメトリクス
+    col1, col2, col3, col4, col5 = st.columns(5)
 
-total_return = (port_cum_returns[-1] - 1) * 100
+    total_return = (port_cum_returns[-1] - 1) * 100
 
-with col1:
-    st.metric("累積リターン（実績）", f"{total_return:.2f}%")
-with col2:
-    st.metric("年率リターン（実績）", f"{selected_stats['年率リターン']*100:.2f}%")
-with col3:
-    st.metric("年平均リスク（実績）", f"{selected_stats['年率ボラティリティ']*100:.2f}%")
-with col4:
-    st.metric("シャープレシオ", f"{selected_stats['シャープレシオ']:.3f}")
-with col5:
-    st.metric("最大DD（実績）", f"{selected_stats['最大ドローダウン']*100:.2f}%")
+    with col1:
+        st.metric("累積リターン（実績）", f"{total_return:.2f}%")
+    with col2:
+        st.metric("年率リターン（実績）", f"{selected_stats['年率リターン']*100:.2f}%")
+    with col3:
+        st.metric("年平均リスク（実績）", f"{selected_stats['年率ボラティリティ']*100:.2f}%")
+    with col4:
+        st.metric("シャープレシオ", f"{selected_stats['シャープレシオ']:.3f}")
+    with col5:
+        st.metric("最大DD（実績）", f"{selected_stats['最大ドローダウン']*100:.2f}%")
 
-# チャート作成
-fig = go.Figure()
+    # チャート作成
+    fig = go.Figure()
 
-# ポートフォリオ
-fig.add_trace(go.Scatter(
-    x=df_filtered.index[-len(port_cum_returns):],
-    y=port_cum_returns,
-    mode='lines',
-    name=selected_profile,
-    line=dict(color=portfolios[selected_profile]["config"]["color"], width=3)
-))
-
-# 構成ファンド
-colors = px.colors.qualitative.Pastel
-for i, fund in enumerate(constituent_funds):
-    fund_cum = (1 + df_returns[fund].iloc[-len(port_returns):]).cumprod()
+    # ポートフォリオ
     fig.add_trace(go.Scatter(
-        x=df_filtered.index[-len(fund_cum):],
-        y=fund_cum,
+        x=df_filtered.index[-len(port_cum_returns):],
+        y=port_cum_returns,
         mode='lines',
-        name=fund[:25] + '...' if len(fund) > 25 else fund,
-        line=dict(color=colors[i % len(colors)], width=1, dash='dot'),
-        opacity=0.5,
-        visible='legendonly'  # 初期は非表示
+        name=selected_profile,
+        line=dict(color=portfolios[selected_profile]["config"]["color"], width=3)
     ))
 
-# ベンチマーク
-if benchmark != "なし":
-    bench_returns = df_filtered[benchmark].pct_change().dropna()
-    # iloc[-n:] でポートフォリオと期間を合わせ、indexを直接x軸に使用
-    # (dropna後のindexをそのまま使うことで欠損値による日付ずれを防止)
-    bench_slice = bench_returns.iloc[-len(port_returns):]
-    bench_cum = (1 + bench_slice).cumprod()
-    fig.add_trace(go.Scatter(
-        x=bench_cum.index,
-        y=bench_cum.values,
-        mode='lines',
-        name=f'{benchmark} (ベンチマーク)',
-        line=dict(color='black', width=2, dash='dash')
-    ))
+    # 構成ファンド
+    colors = px.colors.qualitative.Pastel
+    for i, fund in enumerate(constituent_funds):
+        fund_cum = (1 + df_returns[fund].iloc[-len(port_returns):]).cumprod()
+        fig.add_trace(go.Scatter(
+            x=df_filtered.index[-len(fund_cum):],
+            y=fund_cum,
+            mode='lines',
+            name=fund[:25] + '...' if len(fund) > 25 else fund,
+            line=dict(color=colors[i % len(colors)], width=1, dash='dot'),
+            opacity=0.5,
+            visible='legendonly'  # 初期は非表示
+        ))
 
-fig.update_layout(
-    title=f"{selected_profile} - 累積リターン推移",
-    xaxis_title="日付",
-    yaxis_title="累積リターン",
-    hovermode='x unified',
-    height=600,
-    legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
-)
+    # ベンチマーク
+    if benchmark != "なし":
+        bench_returns = df_filtered[benchmark].pct_change().dropna()
+        # iloc[-n:] でポートフォリオと期間を合わせ、indexを直接x軸に使用
+        # (dropna後のindexをそのまま使うことで欠損値による日付ずれを防止)
+        bench_slice = bench_returns.iloc[-len(port_returns):]
+        bench_cum = (1 + bench_slice).cumprod()
+        fig.add_trace(go.Scatter(
+            x=bench_cum.index,
+            y=bench_cum.values,
+            mode='lines',
+            name=f'{benchmark} (ベンチマーク)',
+            line=dict(color='black', width=2, dash='dash')
+        ))
 
-st.plotly_chart(fig, use_container_width=True, key=f"{selected_profile}_cumret")
-
-# 月次リターン分布
-col1, col2 = st.columns(2)
-
-with col1:
-    fig_hist = go.Figure(data=[go.Histogram(
-        x=port_returns * 100,
-        nbinsx=30,
-        marker_color=portfolios[selected_profile]["config"]["color"]
-    )])
-    fig_hist.update_layout(
-        title="月次リターン分布",
-        xaxis_title="リターン (%)",
-        yaxis_title="頻度",
-        height=400
+    fig.update_layout(
+        title=f"{selected_profile} - 累積リターン推移",
+        xaxis_title="日付",
+        yaxis_title="累積リターン",
+        hovermode='x unified',
+        height=600,
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
     )
-    st.plotly_chart(fig_hist, use_container_width=True, key=f"{selected_profile}_hist")
 
-with col2:
-    # 年次リターン
-    port_returns_series = pd.Series(port_returns, index=df_filtered.index[-len(port_returns):])
-    yearly_returns = port_returns_series.resample('YE').apply(lambda x: (1 + x).prod() - 1)
+    st.plotly_chart(fig, use_container_width=True, key=f"{selected_profile}_cumret")
 
-    # Y軸の範囲を計算（アノテーションが見切れないように余白を追加）
-    y_values = yearly_returns.values * 100
-    y_min = y_values.min()
-    y_max = y_values.max()
-    y_range = y_max - y_min
+    # 月次リターン分布
+    col1, col2 = st.columns(2)
 
-    # 上下に余白を追加（最大値側は+20%、最小値側は-20%）
-    if y_range > 0:
-        y_axis_min = y_min - y_range * 0.3 if y_min < 0 else y_min - y_range * 0.2
-        y_axis_max = y_max + y_range * 0.3 if y_max > 0 else y_max + y_range * 0.2
-    else:
-        # 全て同じ値の場合
-        y_axis_min = y_min - 5
-        y_axis_max = y_max + 5
+    with col1:
+        fig_hist = go.Figure(data=[go.Histogram(
+            x=port_returns * 100,
+            nbinsx=30,
+            marker_color=portfolios[selected_profile]["config"]["color"]
+        )])
+        fig_hist.update_layout(
+            title="月次リターン分布",
+            xaxis_title="リターン (%)",
+            yaxis_title="頻度",
+            height=400
+        )
+        st.plotly_chart(fig_hist, use_container_width=True, key=f"{selected_profile}_hist")
 
-    fig_yearly = go.Figure(data=[go.Bar(
-        x=yearly_returns.index.year,
-        y=y_values,
-        marker_color=portfolios[selected_profile]["config"]["color"],
-        text=[f'{val:.1f}%' for val in y_values],
-        textposition='outside'
-    )])
-    fig_yearly.update_layout(
-        title="年次リターン",
-        xaxis_title="年",
-        yaxis_title="リターン (%)",
-        yaxis=dict(range=[y_axis_min, y_axis_max]),
-        height=400
-    )
-    st.plotly_chart(fig_yearly, use_container_width=True, key=f"{selected_profile}_yearly")
+    with col2:
+        # 年次リターン
+        port_returns_series = pd.Series(port_returns, index=df_filtered.index[-len(port_returns):])
+        yearly_returns = port_returns_series.resample('YE').apply(lambda x: (1 + x).prod() - 1)
 
-# 構成ファンドの個別チャート
-st.markdown("### 構成ファンドの価格推移")
-st.caption("💡 ポートフォリオを構成する各ファンドの価格推移（基準価格=100として正規化）")
+        # Y軸の範囲を計算（アノテーションが見切れないように余白を追加）
+        y_values = yearly_returns.values * 100
+        y_min = y_values.min()
+        y_max = y_values.max()
+        y_range = y_max - y_min
 
-# 1%以上の比重を持つファンドのみ表示
-constituent_funds_charts = [selected_funds[i] for i, w in enumerate(selected_weights) if w > 0.01]
+        # 上下に余白を追加（最大値側は+20%、最小値側は-20%）
+        if y_range > 0:
+            y_axis_min = y_min - y_range * 0.3 if y_min < 0 else y_min - y_range * 0.2
+            y_axis_max = y_max + y_range * 0.3 if y_max > 0 else y_max + y_range * 0.2
+        else:
+            # 全て同じ値の場合
+            y_axis_min = y_min - 5
+            y_axis_max = y_max + 5
 
-# 2列レイアウトで表示
-num_cols = 2
-num_funds = len(constituent_funds_charts)
+        fig_yearly = go.Figure(data=[go.Bar(
+            x=yearly_returns.index.year,
+            y=y_values,
+            marker_color=portfolios[selected_profile]["config"]["color"],
+            text=[f'{val:.1f}%' for val in y_values],
+            textposition='outside'
+        )])
+        fig_yearly.update_layout(
+            title="年次リターン",
+            xaxis_title="年",
+            yaxis_title="リターン (%)",
+            yaxis=dict(range=[y_axis_min, y_axis_max]),
+            height=400
+        )
+        st.plotly_chart(fig_yearly, use_container_width=True, key=f"{selected_profile}_yearly")
 
-for i in range(0, num_funds, num_cols):
-    cols = st.columns(num_cols)
+    # 構成ファンドの個別チャート
+    st.markdown("### 構成ファンドの価格推移")
+    st.caption("💡 ポートフォリオを構成する各ファンドの価格推移（基準価格=100として正規化）")
 
-    for j in range(num_cols):
-        if i + j < num_funds:
-            fund = constituent_funds_charts[i + j]
-            fund_idx = selected_funds.index(fund)
+    # 1%以上の比重を持つファンドのみ表示
+    constituent_funds_charts = [selected_funds[i] for i, w in enumerate(selected_weights) if w > 0.01]
 
-            with cols[j]:
-                # ファンドの価格データを正規化（開始時点=100）
-                fund_prices = df_filtered[fund].dropna()
-                fund_prices_normalized = (fund_prices / fund_prices.iloc[0]) * 100
+    # 2列レイアウトで表示
+    num_cols = 2
+    num_funds = len(constituent_funds_charts)
 
-                # チャート作成
-                fig_fund = go.Figure()
-                fig_fund.add_trace(go.Scatter(
-                    x=fund_prices_normalized.index,
-                    y=fund_prices_normalized.values,
-                    mode='lines',
-                    name=fund[:30] + '...' if len(fund) > 30 else fund,
-                    line=dict(color=portfolios[selected_profile]["config"]["color"], width=2),
-                    fill='tozeroy',
-                    fillcolor=f"rgba({int(portfolios[selected_profile]['config']['color'][1:3], 16)}, "
-                             f"{int(portfolios[selected_profile]['config']['color'][3:5], 16)}, "
-                             f"{int(portfolios[selected_profile]['config']['color'][5:7], 16)}, 0.1)"
-                ))
+    for i in range(0, num_funds, num_cols):
+        cols = st.columns(num_cols)
 
-                # 統計情報
-                weight_pct = selected_weights[fund_idx] * 100
-                fund_return = fund_stats.loc[fund, '年率リターン'] * 100
-                fund_vol = fund_stats.loc[fund, '年率ボラ'] * 100
+        for j in range(num_cols):
+            if i + j < num_funds:
+                fund = constituent_funds_charts[i + j]
+                fund_idx = selected_funds.index(fund)
 
-                fig_fund.update_layout(
-                    title=f"{fund[:40]}<br><sub>比重: {weight_pct:.1f}% | リターン: {fund_return:.1f}% | ボラ: {fund_vol:.1f}%</sub>",
-                    xaxis_title="",
-                    yaxis_title="基準価格 (開始時=100)",
-                    height=350,
-                    showlegend=False,
-                    hovermode='x unified',
-                    margin=dict(t=80, b=40, l=60, r=20)
-                )
+                with cols[j]:
+                    # ファンドの価格データを正規化（開始時点=100）
+                    fund_prices = df_filtered[fund].dropna()
+                    fund_prices_normalized = (fund_prices / fund_prices.iloc[0]) * 100
 
-                st.plotly_chart(fig_fund, use_container_width=True, key=f"{selected_profile}_fund_{fund}")
+                    # チャート作成
+                    fig_fund = go.Figure()
+                    fig_fund.add_trace(go.Scatter(
+                        x=fund_prices_normalized.index,
+                        y=fund_prices_normalized.values,
+                        mode='lines',
+                        name=fund[:30] + '...' if len(fund) > 30 else fund,
+                        line=dict(color=portfolios[selected_profile]["config"]["color"], width=2),
+                        fill='tozeroy',
+                        fillcolor=f"rgba({int(portfolios[selected_profile]['config']['color'][1:3], 16)}, "
+                                 f"{int(portfolios[selected_profile]['config']['color'][3:5], 16)}, "
+                                 f"{int(portfolios[selected_profile]['config']['color'][5:7], 16)}, 0.1)"
+                    ))
+
+                    # 統計情報
+                    weight_pct = selected_weights[fund_idx] * 100
+                    fund_return = fund_stats.loc[fund, '年率リターン'] * 100
+                    fund_vol = fund_stats.loc[fund, '年率ボラ'] * 100
+
+                    fig_fund.update_layout(
+                        title=f"{fund[:40]}<br><sub>比重: {weight_pct:.1f}% | リターン: {fund_return:.1f}% | ボラ: {fund_vol:.1f}%</sub>",
+                        xaxis_title="",
+                        yaxis_title="基準価格 (開始時=100)",
+                        height=350,
+                        showlegend=False,
+                        hovermode='x unified',
+                        margin=dict(t=80, b=40, l=60, r=20)
+                    )
+
+                    st.plotly_chart(fig_fund, use_container_width=True, key=f"{selected_profile}_fund_{fund}")
 
 
 
@@ -557,48 +557,48 @@ def _render_tab_allocation(
     fund_stats, core_fund, core_idx,
 ):
     """Tab2：ポートフォリオ構成（円グラフ＋詳細テーブル）。"""
-st.markdown(f"### {selected_profile} - ポートフォリオ構成")
+    st.markdown(f"### {selected_profile} - ポートフォリオ構成")
 
-# 比重データ
-weights_df = pd.DataFrame({
-    'ファンド': selected_funds,
-    '比重(%)': selected_weights * 100,
-    '年率リターン(%)': [fund_stats.loc[f, '年率リターン'] * 100 for f in selected_funds],
-    '年平均リスク(%)': [fund_stats.loc[f, '年率ボラ'] * 100 for f in selected_funds],
-    'シャープレシオ': [fund_stats.loc[f, 'シャープレシオ'] for f in selected_funds]
-})
-weights_df = weights_df[weights_df['比重(%)'] > 1.0].sort_values('比重(%)', ascending=False)
+    # 比重データ
+    weights_df = pd.DataFrame({
+        'ファンド': selected_funds,
+        '比重(%)': selected_weights * 100,
+        '年率リターン(%)': [fund_stats.loc[f, '年率リターン'] * 100 for f in selected_funds],
+        '年平均リスク(%)': [fund_stats.loc[f, '年率ボラ'] * 100 for f in selected_funds],
+        'シャープレシオ': [fund_stats.loc[f, 'シャープレシオ'] for f in selected_funds]
+    })
+    weights_df = weights_df[weights_df['比重(%)'] > 1.0].sort_values('比重(%)', ascending=False)
 
-col1, col2 = st.columns([1, 1])
+    col1, col2 = st.columns([1, 1])
 
-with col1:
-    # パイチャート
-    fig_pie = go.Figure(data=[go.Pie(
-        labels=weights_df['ファンド'].apply(lambda x: x[:30] + '...' if len(x) > 30 else x),
-        values=weights_df['比重(%)'],
-        hole=0.4,
-        marker=dict(colors=px.colors.qualitative.Set3)
-    )])
-    fig_pie.update_layout(title="ファンド構成比率", height=500)
-    st.plotly_chart(fig_pie, use_container_width=True, key=f"{selected_profile}_pie")
+    with col1:
+        # パイチャート
+        fig_pie = go.Figure(data=[go.Pie(
+            labels=weights_df['ファンド'].apply(lambda x: x[:30] + '...' if len(x) > 30 else x),
+            values=weights_df['比重(%)'],
+            hole=0.4,
+            marker=dict(colors=px.colors.qualitative.Set3)
+        )])
+        fig_pie.update_layout(title="ファンド構成比率", height=500)
+        st.plotly_chart(fig_pie, use_container_width=True, key=f"{selected_profile}_pie")
 
-with col2:
-    # トリーマップ
-    fig_tree = go.Figure(go.Treemap(
-        labels=weights_df['ファンド'].apply(lambda x: x[:25]),
-        parents=[""] * len(weights_df),
-        values=weights_df['比重(%)'],
-        textinfo="label+value+percent parent",
-        marker=dict(colors=px.colors.qualitative.Pastel)
-    ))
-    fig_tree.update_layout(title="ポートフォリオ構造", height=500)
-    st.plotly_chart(fig_tree, use_container_width=True, key=f"{selected_profile}_tree")
+    with col2:
+        # トリーマップ
+        fig_tree = go.Figure(go.Treemap(
+            labels=weights_df['ファンド'].apply(lambda x: x[:25]),
+            parents=[""] * len(weights_df),
+            values=weights_df['比重(%)'],
+            textinfo="label+value+percent parent",
+            marker=dict(colors=px.colors.qualitative.Pastel)
+        ))
+        fig_tree.update_layout(title="ポートフォリオ構造", height=500)
+        st.plotly_chart(fig_tree, use_container_width=True, key=f"{selected_profile}_tree")
 
-# 詳細テーブル
-st.dataframe(weights_df.round(3), use_container_width=True, hide_index=True)
+    # 詳細テーブル
+    st.dataframe(weights_df.round(3), use_container_width=True, hide_index=True)
 
-# コアファンドハイライト
-st.info(f"🎯 コアファンド: **{core_fund}** ({selected_weights[core_idx]*100:.1f}%)")
+    # コアファンドハイライト
+    st.info(f"🎯 コアファンド: **{core_fund}** ({selected_weights[core_idx]*100:.1f}%)")
 
 
 
@@ -608,145 +608,145 @@ def _render_tab_risk(
     analyzer=None,
 ):
     """Tab3：リスク分析（ドローダウン・ローリングボラ・ローリングシャープ）。"""
-st.markdown(f"### {selected_profile} - リスク分析")
+    st.markdown(f"### {selected_profile} - リスク分析")
 
-# ドローダウン計算
-# 先頭に 1.0 を付加して期初損失を正確に捕捉（portfolio_utils 修正J と統一）
-# 付加しない場合、第1期の損失は running_max[0]=cum[0] となり DD[0]=0 になる
-_cum_with_start = np.concatenate([[1.0], port_cum_returns])
-_run_max = np.maximum.accumulate(_cum_with_start)
-_dd_full = (_cum_with_start - _run_max) / _run_max
-drawdown = _dd_full[1:]   # 付加した 1.0 点を除去して系列長を元に戻す
+    # ドローダウン計算
+    # 先頭に 1.0 を付加して期初損失を正確に捕捉（portfolio_utils 修正J と統一）
+    # 付加しない場合、第1期の損失は running_max[0]=cum[0] となり DD[0]=0 になる
+    _cum_with_start = np.concatenate([[1.0], port_cum_returns])
+    _run_max = np.maximum.accumulate(_cum_with_start)
+    _dd_full = (_cum_with_start - _run_max) / _run_max
+    drawdown = _dd_full[1:]   # 付加した 1.0 点を除去して系列長を元に戻す
 
-# ドローダウンチャート
-fig_dd = go.Figure()
-fig_dd.add_trace(go.Scatter(
-    x=df_filtered.index[-len(drawdown):],
-    y=drawdown * 100,
-    mode='lines',
-    fill='tozeroy',
-    name='ドローダウン',
-    line=dict(color='red'),
-    fillcolor='rgba(255, 0, 0, 0.2)'
-))
-fig_dd.update_layout(
-    title="ドローダウン推移",
-    xaxis_title="日付",
-    yaxis_title="ドローダウン (%)",
-    hovermode='x unified',
-    height=400
-)
-st.plotly_chart(fig_dd, use_container_width=True, key=f"{selected_profile}_dd")
-
-# リスク指標 — 従来の4指標
-col1, col2, col3, col4 = st.columns(4)
-
-max_dd_idx = np.argmin(drawdown)
-max_dd_date = df_filtered.index[-len(drawdown):][max_dd_idx]
-
-with col1:
-    st.metric("最大ドローダウン", f"{selected_stats['最大ドローダウン']*100:.2f}%")
-    st.caption(f"発生: {max_dd_date.strftime('%Y年%m月')}")
-with col2:
-    st.metric("ソルティノレシオ", f"{selected_stats['ソルティノレシオ']:.3f}")
-with col3:
-    st.metric("カルマー比率", f"{selected_stats['カルマー比率']:.3f}")
-with col4:
-    st.metric("月次勝率", f"{selected_stats['月次勝率']*100:.1f}%")
-
-# ── [改善G・H] 新指標行 ─────────────────────────────────────
-# ポートフォリオレベルでOmega・Ulcer・Martin・GLを計算して表示
-_pr = pd.Series(port_returns)
-_tau = 0.0
-_pos = np.maximum(_pr - _tau, 0).sum()
-_neg = np.maximum(_tau - _pr, 0).sum()
-_omega_port = min(_pos / _neg, 99.99) if _neg > 1e-8 else (99.99 if _pos > 0 else 0.0)
-
-_dd_sq   = drawdown ** 2
-_ulcer_port = float(np.sqrt(np.mean(_dd_sq)))
-_ann_ret_geom = selected_stats['年率リターン']
-_martin_port  = (_ann_ret_geom / _ulcer_port) if _ulcer_port > 1e-8 else (
-    99.99 if _ann_ret_geom > 0 else 0.0
-)
-_martin_port = min(max(_martin_port, -99.99), 99.99)
-
-_wins   = _pr[_pr > 0]
-_losses = _pr[_pr < 0]
-_ag = _wins.mean()        if len(_wins)   > 0 else 0.0
-_al = abs(_losses.mean()) if len(_losses) > 0 else 1e-8
-_gl_port = min(_ag / _al, 99.99) if _al > 1e-8 and _ag > 0 else (
-    99.99 if _ag > 0 else 0.0
-)
-
-col5, col6, col7, col8 = st.columns(4)
-with col5:
-    st.metric("Omega比率", f"{_omega_port:.3f}",
-              help="τ=0（月次元本割れ）に対する利益/損失の比率。非正規分布も正しく評価。1.0超で損益プラス。")
-with col6:
-    st.metric("Ulcer指数", f"{_ulcer_port*100:.2f}%",
-              help="全期間のドローダウン二乗平均平方根。低いほど「深く長い」DDが少ない。")
-with col7:
-    st.metric("Martin比率", f"{_martin_port:.3f}",
-              help="年率リターン÷Ulcer指数。カルマー比率のUlcer版。高いほど優秀。")
-with col8:
-    st.metric("GL比率", f"{_gl_port:.3f}",
-              help="平均利益÷平均損失の絶対値。1.0超で利益が損失を上回る。売りオプション系は0.2前後に低下。")
-
-# VaR/CVaR（月次）
-col1, col2 = st.columns(2)
-with col1:
-    st.metric("月次VaR (95%)", f"{selected_stats['月次VaR_95']*100:.2f}%")
-with col2:
-    st.metric("月次CVaR (95%)", f"{selected_stats['月次CVaR_95']*100:.2f}%")
-
-# ローリング統計
-port_returns_series = pd.Series(port_returns, index=df_filtered.index[-len(port_returns):])
-
-col1, col2 = st.columns(2)
-
-with col1:
-    # ローリングシャープ（月次リスクフリーレート控除、portfolio_utilsと定義を統一）
-    rfr_monthly = (analyzer.risk_free_rate if analyzer is not None else 0.0) / 12
-    rolling_sharpe = port_returns_series.rolling(window=12, min_periods=12).apply(
-        lambda x: ((x.mean() - rfr_monthly) * 12) / (x.std() * np.sqrt(12)) if x.std() > 0 else 0
-    )
-
-    fig_rs = go.Figure()
-    fig_rs.add_trace(go.Scatter(
-        x=rolling_sharpe.index,
-        y=rolling_sharpe.values,
+    # ドローダウンチャート
+    fig_dd = go.Figure()
+    fig_dd.add_trace(go.Scatter(
+        x=df_filtered.index[-len(drawdown):],
+        y=drawdown * 100,
         mode='lines',
-        name='ローリングシャープ',
-        line=dict(color='blue')
+        fill='tozeroy',
+        name='ドローダウン',
+        line=dict(color='red'),
+        fillcolor='rgba(255, 0, 0, 0.2)'
     ))
-    fig_rs.add_hline(y=0, line_dash="dash", line_color="gray")
-    fig_rs.update_layout(
-        title="12ヶ月ローリングシャープレシオ",
+    fig_dd.update_layout(
+        title="ドローダウン推移",
         xaxis_title="日付",
-        yaxis_title="シャープレシオ",
+        yaxis_title="ドローダウン (%)",
+        hovermode='x unified',
         height=400
     )
-    st.plotly_chart(fig_rs, use_container_width=True, key=f"{selected_profile}_rolling_sharpe")
+    st.plotly_chart(fig_dd, use_container_width=True, key=f"{selected_profile}_dd")
 
-with col2:
-    # ローリングボラティリティ（min_periods=12・ddof=1 をローリングシャープと統一）
-    rolling_vol = port_returns_series.rolling(window=12, min_periods=12).std(ddof=1) * np.sqrt(12)
+    # リスク指標 — 従来の4指標
+    col1, col2, col3, col4 = st.columns(4)
 
-    fig_rv = go.Figure()
-    fig_rv.add_trace(go.Scatter(
-        x=rolling_vol.index,
-        y=rolling_vol.values * 100,
-        mode='lines',
-        name='ローリングボラ',
-        line=dict(color='orange')
-    ))
-    fig_rv.update_layout(
-        title="12ヶ月ローリングボラティリティ",
-        xaxis_title="日付",
-        yaxis_title="ボラティリティ (%)",
-        height=400
+    max_dd_idx = np.argmin(drawdown)
+    max_dd_date = df_filtered.index[-len(drawdown):][max_dd_idx]
+
+    with col1:
+        st.metric("最大ドローダウン", f"{selected_stats['最大ドローダウン']*100:.2f}%")
+        st.caption(f"発生: {max_dd_date.strftime('%Y年%m月')}")
+    with col2:
+        st.metric("ソルティノレシオ", f"{selected_stats['ソルティノレシオ']:.3f}")
+    with col3:
+        st.metric("カルマー比率", f"{selected_stats['カルマー比率']:.3f}")
+    with col4:
+        st.metric("月次勝率", f"{selected_stats['月次勝率']*100:.1f}%")
+
+    # ── [改善G・H] 新指標行 ─────────────────────────────────────
+    # ポートフォリオレベルでOmega・Ulcer・Martin・GLを計算して表示
+    _pr = pd.Series(port_returns)
+    _tau = 0.0
+    _pos = np.maximum(_pr - _tau, 0).sum()
+    _neg = np.maximum(_tau - _pr, 0).sum()
+    _omega_port = min(_pos / _neg, 99.99) if _neg > 1e-8 else (99.99 if _pos > 0 else 0.0)
+
+    _dd_sq   = drawdown ** 2
+    _ulcer_port = float(np.sqrt(np.mean(_dd_sq)))
+    _ann_ret_geom = selected_stats['年率リターン']
+    _martin_port  = (_ann_ret_geom / _ulcer_port) if _ulcer_port > 1e-8 else (
+        99.99 if _ann_ret_geom > 0 else 0.0
     )
-    st.plotly_chart(fig_rv, use_container_width=True, key=f"{selected_profile}_rolling_vol")
+    _martin_port = min(max(_martin_port, -99.99), 99.99)
+
+    _wins   = _pr[_pr > 0]
+    _losses = _pr[_pr < 0]
+    _ag = _wins.mean()        if len(_wins)   > 0 else 0.0
+    _al = abs(_losses.mean()) if len(_losses) > 0 else 1e-8
+    _gl_port = min(_ag / _al, 99.99) if _al > 1e-8 and _ag > 0 else (
+        99.99 if _ag > 0 else 0.0
+    )
+
+    col5, col6, col7, col8 = st.columns(4)
+    with col5:
+        st.metric("Omega比率", f"{_omega_port:.3f}",
+                  help="τ=0（月次元本割れ）に対する利益/損失の比率。非正規分布も正しく評価。1.0超で損益プラス。")
+    with col6:
+        st.metric("Ulcer指数", f"{_ulcer_port*100:.2f}%",
+                  help="全期間のドローダウン二乗平均平方根。低いほど「深く長い」DDが少ない。")
+    with col7:
+        st.metric("Martin比率", f"{_martin_port:.3f}",
+                  help="年率リターン÷Ulcer指数。カルマー比率のUlcer版。高いほど優秀。")
+    with col8:
+        st.metric("GL比率", f"{_gl_port:.3f}",
+                  help="平均利益÷平均損失の絶対値。1.0超で利益が損失を上回る。売りオプション系は0.2前後に低下。")
+
+    # VaR/CVaR（月次）
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("月次VaR (95%)", f"{selected_stats['月次VaR_95']*100:.2f}%")
+    with col2:
+        st.metric("月次CVaR (95%)", f"{selected_stats['月次CVaR_95']*100:.2f}%")
+
+    # ローリング統計
+    port_returns_series = pd.Series(port_returns, index=df_filtered.index[-len(port_returns):])
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # ローリングシャープ（月次リスクフリーレート控除、portfolio_utilsと定義を統一）
+        rfr_monthly = (analyzer.risk_free_rate if analyzer is not None else 0.0) / 12
+        rolling_sharpe = port_returns_series.rolling(window=12, min_periods=12).apply(
+            lambda x: ((x.mean() - rfr_monthly) * 12) / (x.std() * np.sqrt(12)) if x.std() > 0 else 0
+        )
+
+        fig_rs = go.Figure()
+        fig_rs.add_trace(go.Scatter(
+            x=rolling_sharpe.index,
+            y=rolling_sharpe.values,
+            mode='lines',
+            name='ローリングシャープ',
+            line=dict(color='blue')
+        ))
+        fig_rs.add_hline(y=0, line_dash="dash", line_color="gray")
+        fig_rs.update_layout(
+            title="12ヶ月ローリングシャープレシオ",
+            xaxis_title="日付",
+            yaxis_title="シャープレシオ",
+            height=400
+        )
+        st.plotly_chart(fig_rs, use_container_width=True, key=f"{selected_profile}_rolling_sharpe")
+
+    with col2:
+        # ローリングボラティリティ（min_periods=12・ddof=1 をローリングシャープと統一）
+        rolling_vol = port_returns_series.rolling(window=12, min_periods=12).std(ddof=1) * np.sqrt(12)
+
+        fig_rv = go.Figure()
+        fig_rv.add_trace(go.Scatter(
+            x=rolling_vol.index,
+            y=rolling_vol.values * 100,
+            mode='lines',
+            name='ローリングボラ',
+            line=dict(color='orange')
+        ))
+        fig_rv.update_layout(
+            title="12ヶ月ローリングボラティリティ",
+            xaxis_title="日付",
+            yaxis_title="ボラティリティ (%)",
+            height=400
+        )
+        st.plotly_chart(fig_rv, use_container_width=True, key=f"{selected_profile}_rolling_vol")
 
 
 
@@ -755,72 +755,72 @@ def _render_tab_correlation(
     returns_selected, core_fund,
 ):
     """Tab4：相関分析（ヒートマップ・コアファンドとのローリング相関）。"""
-st.markdown("### 相関分析")
+    st.markdown("### 相関分析")
 
-# 選定ファンドの相関マトリックス
-corr_matrix = returns_selected.corr()
+    # 選定ファンドの相関マトリックス
+    corr_matrix = returns_selected.corr()
 
-# ヒートマップ
-fig_corr = go.Figure(data=go.Heatmap(
-    z=corr_matrix.values,
-    x=[f[:15] + '...' if len(f) > 15 else f for f in corr_matrix.columns],
-    y=[f[:15] + '...' if len(f) > 15 else f for f in corr_matrix.index],
-    colorscale='RdBu_r',
-    zmid=0,
-    zmin=-1,
-    zmax=1,
-    text=np.round(corr_matrix.values, 2),
-    texttemplate='%{text}',
-    textfont={"size": 7},
-    hovertemplate='%{y} vs %{x}<br>相関: %{z:.3f}<extra></extra>'
-))
-fig_corr.update_layout(
-    title="選定ファンド相関マトリックス",
-    height=700,
-    xaxis={'side': 'bottom', 'tickangle': 45}
-)
-st.plotly_chart(fig_corr, use_container_width=True, key=f"{selected_profile}_corr_matrix")
-
-# コアファンドとのローリング相関
-st.markdown(f"#### {core_fund} とのローリング相関 (12ヶ月)")
-
-constituent_funds_corr = [f for i, f in enumerate(selected_funds) 
-                         if selected_weights[i] > 0.02 and f != core_fund]
-
-fig_rc = go.Figure()
-
-colors = px.colors.qualitative.Set1
-for i, fund in enumerate(constituent_funds_corr[:10]):
-    # Series.rolling().corr() を使用：DatetimeIndex が保持され正確に描画される
-    # DataFrame.rolling().corr() の MultiIndex 問題を回避
-    rolling_corr_values = (
-        returns_selected[core_fund]
-        .rolling(window=12, min_periods=12)  # D-02修正: ローリングシャープ(min_periods=12)と統一
-        .corr(returns_selected[fund])
-        .dropna()
-    )
-
-    if len(rolling_corr_values) == 0:
-        continue
-
-    fig_rc.add_trace(go.Scatter(
-        x=rolling_corr_values.index,
-        y=rolling_corr_values.values,
-        mode='lines',
-        name=fund[:20] + '...' if len(fund) > 20 else fund,
-        line=dict(color=colors[i % len(colors)]),
-        hovertemplate='%{x|%Y-%m}<br>相関: %{y:.3f}<extra></extra>'
+    # ヒートマップ
+    fig_corr = go.Figure(data=go.Heatmap(
+        z=corr_matrix.values,
+        x=[f[:15] + '...' if len(f) > 15 else f for f in corr_matrix.columns],
+        y=[f[:15] + '...' if len(f) > 15 else f for f in corr_matrix.index],
+        colorscale='RdBu_r',
+        zmid=0,
+        zmin=-1,
+        zmax=1,
+        text=np.round(corr_matrix.values, 2),
+        texttemplate='%{text}',
+        textfont={"size": 7},
+        hovertemplate='%{y} vs %{x}<br>相関: %{z:.3f}<extra></extra>'
     ))
+    fig_corr.update_layout(
+        title="選定ファンド相関マトリックス",
+        height=700,
+        xaxis={'side': 'bottom', 'tickangle': 45}
+    )
+    st.plotly_chart(fig_corr, use_container_width=True, key=f"{selected_profile}_corr_matrix")
 
-fig_rc.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
-fig_rc.update_layout(
-    title=f"{core_fund} とのローリング相関推移",
-    xaxis_title="日付",
-    yaxis_title="相関係数",
-    hovermode='x unified',
-    height=500
-)
-st.plotly_chart(fig_rc, use_container_width=True, key=f"{selected_profile}_rolling_corr")
+    # コアファンドとのローリング相関
+    st.markdown(f"#### {core_fund} とのローリング相関 (12ヶ月)")
+
+    constituent_funds_corr = [f for i, f in enumerate(selected_funds) 
+                             if selected_weights[i] > 0.02 and f != core_fund]
+
+    fig_rc = go.Figure()
+
+    colors = px.colors.qualitative.Set1
+    for i, fund in enumerate(constituent_funds_corr[:10]):
+        # Series.rolling().corr() を使用：DatetimeIndex が保持され正確に描画される
+        # DataFrame.rolling().corr() の MultiIndex 問題を回避
+        rolling_corr_values = (
+            returns_selected[core_fund]
+            .rolling(window=12, min_periods=12)  # D-02修正: ローリングシャープ(min_periods=12)と統一
+            .corr(returns_selected[fund])
+            .dropna()
+        )
+
+        if len(rolling_corr_values) == 0:
+            continue
+
+        fig_rc.add_trace(go.Scatter(
+            x=rolling_corr_values.index,
+            y=rolling_corr_values.values,
+            mode='lines',
+            name=fund[:20] + '...' if len(fund) > 20 else fund,
+            line=dict(color=colors[i % len(colors)]),
+            hovertemplate='%{x|%Y-%m}<br>相関: %{y:.3f}<extra></extra>'
+        ))
+
+    fig_rc.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
+    fig_rc.update_layout(
+        title=f"{core_fund} とのローリング相関推移",
+        xaxis_title="日付",
+        yaxis_title="相関係数",
+        hovermode='x unified',
+        height=500
+    )
+    st.plotly_chart(fig_rc, use_container_width=True, key=f"{selected_profile}_rolling_corr")
 
 
 
@@ -829,91 +829,91 @@ def _render_tab_montecarlo(
     returns_selected,
 ):
     """Tab5：モンテカルロシミュレーション（将来シナリオ分布）。"""
-st.markdown("### モンテカルロシミュレーション")
+    st.markdown("### モンテカルロシミュレーション")
 
-st.info("将来のポートフォリオパフォーマンスをシミュレーションします")
+    st.info("将来のポートフォリオパフォーマンスをシミュレーションします")
 
-col1, col2 = st.columns(2)
-with col1:
-    sim_years = st.slider("シミュレーション期間（年）", 1, 10, 5, key=f"{selected_profile}_sim_years")
-with col2:
-    n_simulations = st.slider("シミュレーション回数", 100, 10000, 1000, 100, key=f"{selected_profile}_n_simulations")
+    col1, col2 = st.columns(2)
+    with col1:
+        sim_years = st.slider("シミュレーション期間（年）", 1, 10, 5, key=f"{selected_profile}_sim_years")
+    with col2:
+        n_simulations = st.slider("シミュレーション回数", 100, 10000, 1000, 100, key=f"{selected_profile}_n_simulations")
 
-if st.button("シミュレーション実行", key=f"{selected_profile}_run_mc"):
-    with st.spinner("シミュレーション実行中..."):
-        # モンテカルロシミュレーション
-        n_periods = sim_years * 12
+    if st.button("シミュレーション実行", key=f"{selected_profile}_run_mc"):
+        with st.spinner("シミュレーション実行中..."):
+            # モンテカルロシミュレーション
+            n_periods = sim_years * 12
 
-        # ── 月次パラメータ計算 ──────────────────────────────────────
-        # port_std：時系列リターン系列から直接計算（共分散ベースの年率ボラを逆算するより整合的）
-        port_returns_mc = returns_selected.values @ selected_weights
-        port_std_monthly = float(np.std(port_returns_mc, ddof=1))
+            # ── 月次パラメータ計算 ──────────────────────────────────────
+            # port_std：時系列リターン系列から直接計算（共分散ベースの年率ボラを逆算するより整合的）
+            port_returns_mc = returns_selected.values @ selected_weights
+            port_std_monthly = float(np.std(port_returns_mc, ddof=1))
 
-        # 対数正規分布の μ（月次）：算術平均リターンから分散ハーフを引く
-        # E[r_arithmetic] = exp(μ + σ²/2) - 1  →  μ = ln(1+E[r]) - σ²/2
-        port_mean_arith_monthly = selected_stats['年率期待リターン'] / 12
-        log_mu = np.log1p(port_mean_arith_monthly) - 0.5 * port_std_monthly ** 2
+            # 対数正規分布の μ（月次）：算術平均リターンから分散ハーフを引く
+            # E[r_arithmetic] = exp(μ + σ²/2) - 1  →  μ = ln(1+E[r]) - σ²/2
+            port_mean_arith_monthly = selected_stats['年率期待リターン'] / 12
+            log_mu = np.log1p(port_mean_arith_monthly) - 0.5 * port_std_monthly ** 2
 
-        # ── ベクトル化モンテカルロ ──────────────────────────────────
-        # 正規分布 N(log_mu, port_std_monthly) でログリターンを生成
-        # → exp(累積和) で対数正規過程を正確に模擬
-        # default_rng でグローバル乱数状態を汚染しない
-        rng = np.random.default_rng(42)
-        log_returns = rng.normal(log_mu, port_std_monthly, (n_simulations, n_periods))
-        simulations = np.ones((n_simulations, n_periods + 1))
-        simulations[:, 1:] = np.exp(np.cumsum(log_returns, axis=1))
+            # ── ベクトル化モンテカルロ ──────────────────────────────────
+            # 正規分布 N(log_mu, port_std_monthly) でログリターンを生成
+            # → exp(累積和) で対数正規過程を正確に模擬
+            # default_rng でグローバル乱数状態を汚染しない
+            rng = np.random.default_rng(42)
+            log_returns = rng.normal(log_mu, port_std_monthly, (n_simulations, n_periods))
+            simulations = np.ones((n_simulations, n_periods + 1))
+            simulations[:, 1:] = np.exp(np.cumsum(log_returns, axis=1))
 
-        # 結果プロット
-        fig_mc = go.Figure()
+            # 結果プロット
+            fig_mc = go.Figure()
 
-        # 各シミュレーション
-        for i in range(min(100, n_simulations)):
-            fig_mc.add_trace(go.Scatter(
-                x=list(range(n_periods + 1)),
-                y=simulations[i, :],
-                mode='lines',
-                line=dict(color='lightblue', width=0.5),
-                opacity=0.3,
-                showlegend=False,
-                hoverinfo='skip'
-            ))
+            # 各シミュレーション
+            for i in range(min(100, n_simulations)):
+                fig_mc.add_trace(go.Scatter(
+                    x=list(range(n_periods + 1)),
+                    y=simulations[i, :],
+                    mode='lines',
+                    line=dict(color='lightblue', width=0.5),
+                    opacity=0.3,
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
 
-        # パーセンタイル
-        percentiles = [5, 25, 50, 75, 95]
-        colors_percentile = ['red', 'orange', 'green', 'orange', 'red']
+            # パーセンタイル
+            percentiles = [5, 25, 50, 75, 95]
+            colors_percentile = ['red', 'orange', 'green', 'orange', 'red']
 
-        for pct, color in zip(percentiles, colors_percentile):
-            values = np.percentile(simulations, pct, axis=0)
-            fig_mc.add_trace(go.Scatter(
-                x=list(range(n_periods + 1)),
-                y=values,
-                mode='lines',
-                name=f'{pct}パーセンタイル',
-                line=dict(color=color, width=2)
-            ))
+            for pct, color in zip(percentiles, colors_percentile):
+                values = np.percentile(simulations, pct, axis=0)
+                fig_mc.add_trace(go.Scatter(
+                    x=list(range(n_periods + 1)),
+                    y=values,
+                    mode='lines',
+                    name=f'{pct}パーセンタイル',
+                    line=dict(color=color, width=2)
+                ))
 
-        fig_mc.update_layout(
-            title=f"モンテカルロシミュレーション ({n_simulations}回)",
-            xaxis_title="月数",
-            yaxis_title="ポートフォリオ価値",
-            height=500,
-            hovermode='x unified'
-        )
-        st.plotly_chart(fig_mc, use_container_width=True, key=f"{selected_profile}_montecarlo")
+            fig_mc.update_layout(
+                title=f"モンテカルロシミュレーション ({n_simulations}回)",
+                xaxis_title="月数",
+                yaxis_title="ポートフォリオ価値",
+                height=500,
+                hovermode='x unified'
+            )
+            st.plotly_chart(fig_mc, use_container_width=True, key=f"{selected_profile}_montecarlo")
 
-        # 統計サマリー
-        final_values = simulations[:, -1]
+            # 統計サマリー
+            final_values = simulations[:, -1]
 
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("期待値（中央値）", f"{np.median(final_values):.2f}")
-        with col2:
-            st.metric("95%信頼区間下限", f"{np.percentile(final_values, 5):.2f}")
-        with col3:
-            st.metric("95%信頼区間上限", f"{np.percentile(final_values, 95):.2f}")
-        with col4:
-            prob_profit = (final_values > 1).sum() / n_simulations * 100
-            st.metric("利益確率", f"{prob_profit:.1f}%")
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("期待値（中央値）", f"{np.median(final_values):.2f}")
+            with col2:
+                st.metric("95%信頼区間下限", f"{np.percentile(final_values, 5):.2f}")
+            with col3:
+                st.metric("95%信頼区間上限", f"{np.percentile(final_values, 95):.2f}")
+            with col4:
+                prob_profit = (final_values > 1).sum() / n_simulations * 100
+                st.metric("利益確率", f"{prob_profit:.1f}%")
 
 
 
@@ -923,268 +923,268 @@ def _render_tab_constituents(
     analyzer=None,
 ):
     """Tab6：構成銘柄詳細分析（全期間データ使用・calculate_fund_metrics で統一）。"""
-st.markdown("### 構成銘柄詳細分析")
-st.info("💡 ポートフォリオを構成する各ファンドについて、オリジナルデータ全期間での詳細分析を表示します")
+    st.markdown("### 構成銘柄詳細分析")
+    st.info("💡 ポートフォリオを構成する各ファンドについて、オリジナルデータ全期間での詳細分析を表示します")
 
-# 構成銘柄を特定（ウェイト0.5%以上）
-constituent_funds_analysis = [(selected_funds[i], selected_weights[i]) 
-                             for i in range(len(selected_funds)) 
-                             if selected_weights[i] >= 0.005]
-constituent_funds_analysis.sort(key=lambda x: x[1], reverse=True)
+    # 構成銘柄を特定（ウェイト0.5%以上）
+    constituent_funds_analysis = [(selected_funds[i], selected_weights[i]) 
+                                 for i in range(len(selected_funds)) 
+                                 if selected_weights[i] >= 0.005]
+    constituent_funds_analysis.sort(key=lambda x: x[1], reverse=True)
 
-st.markdown(f"**分析対象ファンド数**: {len(constituent_funds_analysis)}本（ウェイト0.5%以上）")
+    st.markdown(f"**分析対象ファンド数**: {len(constituent_funds_analysis)}本（ウェイト0.5%以上）")
 
-# 各ファンドについてexpander表示
-# D-01修正: st.tabs はStreamlit公式にネストをサポートしていないため st.expander に変更
-if len(constituent_funds_analysis) > 0:
-    for idx, (fund, weight) in enumerate(constituent_funds_analysis):
-        expander_label = (
-            f"{fund[:25]}... ({weight*100:.1f}%)" if len(fund) > 25
-            else f"{fund} ({weight*100:.1f}%)"
-        )
-        with st.expander(expander_label, expanded=(idx == 0)):
-            # ファンド名表示
-            st.markdown(f"#### 📊 {fund}")
-            st.markdown(f"**ポートフォリオ比重**: {weight*100:.2f}%")
+    # 各ファンドについてexpander表示
+    # D-01修正: st.tabs はStreamlit公式にネストをサポートしていないため st.expander に変更
+    if len(constituent_funds_analysis) > 0:
+        for idx, (fund, weight) in enumerate(constituent_funds_analysis):
+            expander_label = (
+                f"{fund[:25]}... ({weight*100:.1f}%)" if len(fund) > 25
+                else f"{fund} ({weight*100:.1f}%)"
+            )
+            with st.expander(expander_label, expanded=(idx == 0)):
+                # ファンド名表示
+                st.markdown(f"#### 📊 {fund}")
+                st.markdown(f"**ポートフォリオ比重**: {weight*100:.2f}%")
 
-            # 全期間データを取得（欠損値を除外）
-            fund_prices_full = df_price[fund].dropna()
+                # 全期間データを取得（欠損値を除外）
+                fund_prices_full = df_price[fund].dropna()
 
-            if len(fund_prices_full) < 12:
-                st.warning(f"⚠️ データポイントが不足しています（{len(fund_prices_full)}ヶ月）")
-                continue
+                if len(fund_prices_full) < 12:
+                    st.warning(f"⚠️ データポイントが不足しています（{len(fund_prices_full)}ヶ月）")
+                    continue
 
-            # ベンチマークデータ
-            if benchmark != "なし":
-                bench_prices_full = df_price[benchmark].dropna()
-                # 期間を合わせる
-                common_idx = fund_prices_full.index.intersection(bench_prices_full.index)
-                fund_prices_full = fund_prices_full.loc[common_idx]
-                bench_prices_full = bench_prices_full.loc[common_idx]
-
-            # データ期間情報
-            st.caption(f"📅 データ期間: {fund_prices_full.index[0].strftime('%Y年%m月')} ～ {fund_prices_full.index[-1].strftime('%Y年%m月')} （{len(fund_prices_full)}ヶ月）")
-
-            # リターン計算
-            fund_returns_full = fund_prices_full.pct_change().dropna()
-
-            # 各期間のリターン計算関数
-            def calc_annualized_return(returns_series, periods):
-                """期間別の年率リターンを計算"""
-                if len(returns_series) < periods:
-                    return np.nan
-                period_returns = returns_series.iloc[-periods:]
-                cum_return = (1 + period_returns).prod() - 1
-                annual_return = (1 + cum_return) ** (12 / periods) - 1
-                return annual_return * 100
-
-            # リターン表作成
-            periods_dict = {
-                "1年": 12,
-                "3年": 36,
-                "5年": 60,
-                "10年": 120,
-                "設定来": len(fund_returns_full)
-            }
-
-            # ファンド名を短縮（30文字以内）
-            fund_name_short = fund[:30] + '...' if len(fund) > 30 else fund
-
-            return_data = []
-            for period_name, period_months in periods_dict.items():
-                fund_ret = calc_annualized_return(fund_returns_full, period_months)
-
+                # ベンチマークデータ
                 if benchmark != "なし":
-                    bench_returns_full = bench_prices_full.pct_change().dropna()
-                    bench_ret = calc_annualized_return(bench_returns_full, period_months)
-                else:
-                    bench_ret = np.nan
+                    bench_prices_full = df_price[benchmark].dropna()
+                    # 期間を合わせる
+                    common_idx = fund_prices_full.index.intersection(bench_prices_full.index)
+                    fund_prices_full = fund_prices_full.loc[common_idx]
+                    bench_prices_full = bench_prices_full.loc[common_idx]
 
-                return_data.append({
-                    "期間": period_name,
-                    fund_name_short: f"{fund_ret:.1f}%" if not np.isnan(fund_ret) else "N/A",
-                    benchmark if benchmark != "なし" else "ベンチマーク": 
-                        f"{bench_ret:.1f}%" if not np.isnan(bench_ret) else "N/A"
-                })
+                # データ期間情報
+                st.caption(f"📅 データ期間: {fund_prices_full.index[0].strftime('%Y年%m月')} ～ {fund_prices_full.index[-1].strftime('%Y年%m月')} （{len(fund_prices_full)}ヶ月）")
 
-            # 定量分析計算（calculate_fund_metrics は portfolio_utils で一元管理）
-            _rf = analyzer.risk_free_rate if analyzer is not None else 0.0
-            if benchmark != "なし":
-                bench_returns_full = bench_prices_full.pct_change().dropna()
-                fund_metrics  = calculate_fund_metrics(fund_returns_full,  bench_returns_full, risk_free_rate=_rf)
-                bench_metrics = calculate_fund_metrics(bench_returns_full, risk_free_rate=_rf)
-            else:
-                fund_metrics  = calculate_fund_metrics(fund_returns_full, risk_free_rate=_rf)
-                bench_metrics = {
-                    "シャープレシオ": "N/A", 
-                    "価格変動リスク": "N/A",
-                    "最大下落率": "N/A",
-                    "相関性": "N/A"
+                # リターン計算
+                fund_returns_full = fund_prices_full.pct_change().dropna()
+
+                # 各期間のリターン計算関数
+                def calc_annualized_return(returns_series, periods):
+                    """期間別の年率リターンを計算"""
+                    if len(returns_series) < periods:
+                        return np.nan
+                    period_returns = returns_series.iloc[-periods:]
+                    cum_return = (1 + period_returns).prod() - 1
+                    annual_return = (1 + cum_return) ** (12 / periods) - 1
+                    return annual_return * 100
+
+                # リターン表作成
+                periods_dict = {
+                    "1年": 12,
+                    "3年": 36,
+                    "5年": 60,
+                    "10年": 120,
+                    "設定来": len(fund_returns_full)
                 }
 
-            _bname = benchmark if benchmark != "なし" else "ベンチマーク"
-            risk_data = [
-                # ── 従来指標 ──────────────────────────────────────
-                {
-                    "指標": "シャープレシオ",
-                    "説明": "リスク調整後リターン（1.0超が優秀）",
-                    fund_name_short: fund_metrics["シャープレシオ"],
-                    _bname: bench_metrics.get("シャープレシオ", "-"),
-                },
-                {
-                    "指標": "価格変動リスク",
-                    "説明": "年率ボラティリティ（低いほど安定）",
-                    fund_name_short: fund_metrics["価格変動リスク"],
-                    _bname: bench_metrics.get("価格変動リスク", "-"),
-                },
-                {
-                    "指標": "最大下落率",
-                    "説明": "設定来の最大ドローダウン",
-                    fund_name_short: fund_metrics["最大下落率"],
-                    _bname: bench_metrics.get("最大下落率", "-"),
-                },
-                # ── [改善G] 新指標 ────────────────────────────────
-                {
-                    "指標": "Omega比率",
-                    "説明": "利益/損失の比率（1.0超で損益プラス）",
-                    fund_name_short: fund_metrics["Omega比率"],
-                    _bname: bench_metrics.get("Omega比率", "-"),
-                },
-                {
-                    "指標": "Ulcer指数",
-                    "説明": "DD累積ペナルティ（低いほど良好）",
-                    fund_name_short: fund_metrics["Ulcer指数"],
-                    _bname: bench_metrics.get("Ulcer指数", "-"),
-                },
-                {
-                    "指標": "Martin比率",
-                    "説明": "リターン÷Ulcer指数（高いほど優秀）",
-                    fund_name_short: fund_metrics["Martin比率"],
-                    _bname: bench_metrics.get("Martin比率", "-"),
-                },
-                # ── [改善H] 新指標 ────────────────────────────────
-                {
-                    "指標": "GL比率",
-                    "説明": "平均利益÷平均損失（1.0超で損益有利）",
-                    fund_name_short: fund_metrics["GL比率"],
-                    _bname: bench_metrics.get("GL比率", "-"),
-                },
-                {
-                    "指標": "相関性",
-                    "説明": "コアとの相関（低いほど分散効果大）",
-                    fund_name_short: fund_metrics["相関性"],
-                    _bname: "-",
-                },
-            ]
+                # ファンド名を短縮（30文字以内）
+                fund_name_short = fund[:30] + '...' if len(fund) > 30 else fund
 
-            # 表示
-            col1, col2 = st.columns(2)
+                return_data = []
+                for period_name, period_months in periods_dict.items():
+                    fund_ret = calc_annualized_return(fund_returns_full, period_months)
 
-            with col1:
-                st.markdown("##### 📊 リターン（年率）")
-                return_df = pd.DataFrame(return_data)
+                    if benchmark != "なし":
+                        bench_returns_full = bench_prices_full.pct_change().dropna()
+                        bench_ret = calc_annualized_return(bench_returns_full, period_months)
+                    else:
+                        bench_ret = np.nan
 
-                # スタイリング付きで表示
-                def color_returns(val):
-                    """リターン値に色付け"""
-                    if isinstance(val, str) and '%' in val:
-                        try:
-                            num_val = float(val.replace('%', ''))
-                            if num_val > 0:
-                                return 'background-color: #d4edda; color: #155724'
-                            elif num_val < 0:
-                                return 'background-color: #f8d7da; color: #721c24'
-                        except:
-                            pass
-                    return ''
+                    return_data.append({
+                        "期間": period_name,
+                        fund_name_short: f"{fund_ret:.1f}%" if not np.isnan(fund_ret) else "N/A",
+                        benchmark if benchmark != "なし" else "ベンチマーク": 
+                            f"{bench_ret:.1f}%" if not np.isnan(bench_ret) else "N/A"
+                    })
 
-                styled_return_df = return_df.style.map(
-                    color_returns,
-                    subset=[fund_name_short, _bname],
-                )
-                st.dataframe(styled_return_df, use_container_width=True, hide_index=True)
+                # 定量分析計算（calculate_fund_metrics は portfolio_utils で一元管理）
+                _rf = analyzer.risk_free_rate if analyzer is not None else 0.0
+                if benchmark != "なし":
+                    bench_returns_full = bench_prices_full.pct_change().dropna()
+                    fund_metrics  = calculate_fund_metrics(fund_returns_full,  bench_returns_full, risk_free_rate=_rf)
+                    bench_metrics = calculate_fund_metrics(bench_returns_full, risk_free_rate=_rf)
+                else:
+                    fund_metrics  = calculate_fund_metrics(fund_returns_full, risk_free_rate=_rf)
+                    bench_metrics = {
+                        "シャープレシオ": "N/A", 
+                        "価格変動リスク": "N/A",
+                        "最大下落率": "N/A",
+                        "相関性": "N/A"
+                    }
 
-            with col2:
-                st.markdown("##### 📉 定量分析（設定来）")
-                risk_df = pd.DataFrame(risk_data)
-                st.dataframe(risk_df, use_container_width=True, hide_index=True)
+                _bname = benchmark if benchmark != "なし" else "ベンチマーク"
+                risk_data = [
+                    # ── 従来指標 ──────────────────────────────────────
+                    {
+                        "指標": "シャープレシオ",
+                        "説明": "リスク調整後リターン（1.0超が優秀）",
+                        fund_name_short: fund_metrics["シャープレシオ"],
+                        _bname: bench_metrics.get("シャープレシオ", "-"),
+                    },
+                    {
+                        "指標": "価格変動リスク",
+                        "説明": "年率ボラティリティ（低いほど安定）",
+                        fund_name_short: fund_metrics["価格変動リスク"],
+                        _bname: bench_metrics.get("価格変動リスク", "-"),
+                    },
+                    {
+                        "指標": "最大下落率",
+                        "説明": "設定来の最大ドローダウン",
+                        fund_name_short: fund_metrics["最大下落率"],
+                        _bname: bench_metrics.get("最大下落率", "-"),
+                    },
+                    # ── [改善G] 新指標 ────────────────────────────────
+                    {
+                        "指標": "Omega比率",
+                        "説明": "利益/損失の比率（1.0超で損益プラス）",
+                        fund_name_short: fund_metrics["Omega比率"],
+                        _bname: bench_metrics.get("Omega比率", "-"),
+                    },
+                    {
+                        "指標": "Ulcer指数",
+                        "説明": "DD累積ペナルティ（低いほど良好）",
+                        fund_name_short: fund_metrics["Ulcer指数"],
+                        _bname: bench_metrics.get("Ulcer指数", "-"),
+                    },
+                    {
+                        "指標": "Martin比率",
+                        "説明": "リターン÷Ulcer指数（高いほど優秀）",
+                        fund_name_short: fund_metrics["Martin比率"],
+                        _bname: bench_metrics.get("Martin比率", "-"),
+                    },
+                    # ── [改善H] 新指標 ────────────────────────────────
+                    {
+                        "指標": "GL比率",
+                        "説明": "平均利益÷平均損失（1.0超で損益有利）",
+                        fund_name_short: fund_metrics["GL比率"],
+                        _bname: bench_metrics.get("GL比率", "-"),
+                    },
+                    {
+                        "指標": "相関性",
+                        "説明": "コアとの相関（低いほど分散効果大）",
+                        fund_name_short: fund_metrics["相関性"],
+                        _bname: "-",
+                    },
+                ]
 
-            # パフォーマンス推移グラフ
-            st.markdown("##### 📈 パフォーマンス推移（指数化）")
+                # 表示
+                col1, col2 = st.columns(2)
 
-            # 指数化（開始時点=100）
-            fund_indexed = (fund_prices_full / fund_prices_full.iloc[0]) * 100
+                with col1:
+                    st.markdown("##### 📊 リターン（年率）")
+                    return_df = pd.DataFrame(return_data)
 
-            fig_perf = go.Figure()
+                    # スタイリング付きで表示
+                    def color_returns(val):
+                        """リターン値に色付け"""
+                        if isinstance(val, str) and '%' in val:
+                            try:
+                                num_val = float(val.replace('%', ''))
+                                if num_val > 0:
+                                    return 'background-color: #d4edda; color: #155724'
+                                elif num_val < 0:
+                                    return 'background-color: #f8d7da; color: #721c24'
+                            except:
+                                pass
+                        return ''
 
-            # ファンド
-            fig_perf.add_trace(go.Scatter(
-                x=fund_indexed.index,
-                y=fund_indexed.values,
-                mode='lines',
-                name=fund[:40] + '...' if len(fund) > 40 else fund,
-                line=dict(color='#ff6b35', width=2.5),
-                hovertemplate='%{x|%Y-%m}<br>価格: %{y:.2f}<extra></extra>'
-            ))
+                    styled_return_df = return_df.style.map(
+                        color_returns,
+                        subset=[fund_name_short, _bname],
+                    )
+                    st.dataframe(styled_return_df, use_container_width=True, hide_index=True)
 
-            # ベンチマーク
-            if benchmark != "なし":
-                bench_indexed = (bench_prices_full / bench_prices_full.iloc[0]) * 100
+                with col2:
+                    st.markdown("##### 📉 定量分析（設定来）")
+                    risk_df = pd.DataFrame(risk_data)
+                    st.dataframe(risk_df, use_container_width=True, hide_index=True)
+
+                # パフォーマンス推移グラフ
+                st.markdown("##### 📈 パフォーマンス推移（指数化）")
+
+                # 指数化（開始時点=100）
+                fund_indexed = (fund_prices_full / fund_prices_full.iloc[0]) * 100
+
+                fig_perf = go.Figure()
+
+                # ファンド
                 fig_perf.add_trace(go.Scatter(
-                    x=bench_indexed.index,
-                    y=bench_indexed.values,
+                    x=fund_indexed.index,
+                    y=fund_indexed.values,
                     mode='lines',
-                    name=benchmark,
-                    line=dict(color='#004e89', width=2, dash='solid'),
-                    opacity=0.7,
+                    name=fund[:40] + '...' if len(fund) > 40 else fund,
+                    line=dict(color='#ff6b35', width=2.5),
                     hovertemplate='%{x|%Y-%m}<br>価格: %{y:.2f}<extra></extra>'
                 ))
 
-            fig_perf.update_layout(
-                title=f"パフォーマンス推移（指数化） - {fund[:50]}",
-                xaxis_title="",
-                yaxis_title="指数（開始時=100）",
-                hovermode='x unified',
-                height=500,
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="right",
-                    x=1
+                # ベンチマーク
+                if benchmark != "なし":
+                    bench_indexed = (bench_prices_full / bench_prices_full.iloc[0]) * 100
+                    fig_perf.add_trace(go.Scatter(
+                        x=bench_indexed.index,
+                        y=bench_indexed.values,
+                        mode='lines',
+                        name=benchmark,
+                        line=dict(color='#004e89', width=2, dash='solid'),
+                        opacity=0.7,
+                        hovertemplate='%{x|%Y-%m}<br>価格: %{y:.2f}<extra></extra>'
+                    ))
+
+                fig_perf.update_layout(
+                    title=f"パフォーマンス推移（指数化） - {fund[:50]}",
+                    xaxis_title="",
+                    yaxis_title="指数（開始時=100）",
+                    hovermode='x unified',
+                    height=500,
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1
+                    )
                 )
-            )
 
-            # 期間表示を追加
-            fig_perf.add_annotation(
-                text=f"表示期間: {fund_prices_full.index[0].strftime('%Y年%m月')} 〜 {fund_prices_full.index[-1].strftime('%Y年%m月')}",
-                xref="paper", yref="paper",
-                x=1, y=-0.1,
-                showarrow=False,
-                xanchor='right',
-                font=dict(size=9, color='gray')
-            )
+                # 期間表示を追加
+                fig_perf.add_annotation(
+                    text=f"表示期間: {fund_prices_full.index[0].strftime('%Y年%m月')} 〜 {fund_prices_full.index[-1].strftime('%Y年%m月')}",
+                    xref="paper", yref="paper",
+                    x=1, y=-0.1,
+                    showarrow=False,
+                    xanchor='right',
+                    font=dict(size=9, color='gray')
+                )
 
-            st.plotly_chart(fig_perf, use_container_width=True, key=f"{selected_profile}_fund_perf_{idx}")
+                st.plotly_chart(fig_perf, use_container_width=True, key=f"{selected_profile}_fund_perf_{idx}")
 
-            # 統計サマリー
-            st.markdown("##### 📋 統計サマリー")
+                # 統計サマリー
+                st.markdown("##### 📋 統計サマリー")
 
-            col1, col2, col3, col4 = st.columns(4)
+                col1, col2, col3, col4 = st.columns(4)
 
-            # 設定来リターン
-            total_return_fund = ((fund_prices_full.iloc[-1] / fund_prices_full.iloc[0]) - 1) * 100
-            annual_return_fund = calc_annualized_return(fund_returns_full, len(fund_returns_full))
-            annual_vol_fund = fund_returns_full.std(ddof=1) * np.sqrt(12) * 100  # D-04修正: ddof=1明示（calc_metrics・FundScreenerと統一）
+                # 設定来リターン
+                total_return_fund = ((fund_prices_full.iloc[-1] / fund_prices_full.iloc[0]) - 1) * 100
+                annual_return_fund = calc_annualized_return(fund_returns_full, len(fund_returns_full))
+                annual_vol_fund = fund_returns_full.std(ddof=1) * np.sqrt(12) * 100  # D-04修正: ddof=1明示（calc_metrics・FundScreenerと統一）
 
-            with col1:
-                st.metric("設定来リターン", f"{total_return_fund:.1f}%")
-            with col2:
-                st.metric("年率リターン", f"{annual_return_fund:.1f}%")
-            with col3:
-                st.metric("年平均リスク", f"{annual_vol_fund:.1f}%")
-            with col4:
-                st.metric("データ期間", f"{len(fund_prices_full)}ヶ月")
+                with col1:
+                    st.metric("設定来リターン", f"{total_return_fund:.1f}%")
+                with col2:
+                    st.metric("年率リターン", f"{annual_return_fund:.1f}%")
+                with col3:
+                    st.metric("年平均リスク", f"{annual_vol_fund:.1f}%")
+                with col4:
+                    st.metric("データ期間", f"{len(fund_prices_full)}ヶ月")
 
 
 def render_profile_detail(
