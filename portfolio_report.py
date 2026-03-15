@@ -194,8 +194,10 @@ def render_report_panel(
     ctx: dict,
     portfolios, selected_funds, core_fund, core_idx,
     fund_stats, returns_selected, rf_rate,
+    show_rp: bool = False,
 ):
     """統合レポートパネル（プロファイルカード＋3タブ）を描画する。"""
+    _show_rp = show_rp  # portfolio_app.py のサイドバー値をローカル変数にバインド
     # ─── プロファイルカード ───────────────────────────────────
     # ─── 統合レポートパネル（3タブ構成: 比較/構成/リスク・リターン）──────
 
