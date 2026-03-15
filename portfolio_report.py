@@ -20,7 +20,6 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 from portfolio_charts import donut_svg as _donut_svg, badge as _badge  # [ISSUE-3修正] 公開 API から import
@@ -299,11 +298,9 @@ def render_report_panel(
     tr_portfolio=None,
 ):
     """統合レポートパネル（プロファイルカード＋3タブ）を描画する。"""
-    # portfolio_app.py のサイドバー値をローカル変数にバインド
-    _show_rp      = show_rp
-    _use_lw       = use_lw
-    _rp_result    = rp_result
-    _tr_portfolio = tr_portfolio
+    # _show_rp のみローカル変数にバインド（条件分岐で複数箇所から参照するため）
+    # use_lw / rp_result / tr_portfolio は直接パラメータ名で参照する
+    _show_rp = show_rp
     if overview_raw is None:
         overview_raw = pd.DataFrame()
 
@@ -343,7 +340,7 @@ def render_report_panel(
 
     _rank_ret  = _rank_desc("ret")           # リターン高い＝1位
     _rank_sr   = _rank_desc("sr")            # シャープ高い＝1位
-    _rank_vol  = _rank_asc("vol")            # ボラ低い＝1位
+    _rank_vol  = _rank_asc("vol")            # ボラ低い＝1位（将来の解説文拡張用に保持）
     _rank_dd   = _rank_desc("dd")            # DDは負値→大きい（-1%）＝1位（下落小さい）
 
     def _ordinal_jp(n):
@@ -356,7 +353,7 @@ def render_report_panel(
         ret_sign  = "+" if ret_ >= 0 else ""
         r_ret  = _rank_ret[pname]
         r_sr   = _rank_sr[pname]
-        r_vol  = _rank_vol[pname]
+        _      = _rank_vol[pname]  # ボラ順位 — 将来の解説文拡張用（現在は r_dd/r_sr/r_ret で解説）
         r_dd   = _rank_dd[pname]   # 1=下落最小、5=下落最大
 
         # ── 第1文：リターンの位置づけ ──────────────────────────
@@ -516,7 +513,6 @@ def render_report_panel(
         # ── プロファイル選択ボタン行 ──────────────────────────────
         _btn_cols = st.columns(5)
         for _bi, _bpname in enumerate(profile_order_list):
-            _bmeta  = _PROFILE_META.get(_bpname, {"color": "#555"})
             _is_sel = (_bpname == st.session_state["selected_card_profile"])
             _label  = f"✔ {_bpname}" if _is_sel else _bpname
             with _btn_cols[_bi]:
@@ -904,8 +900,6 @@ def render_report_panel(
         # ── データ収集（数値はfloatのまま保持） ─────────────────────
         _summary_rows = []
         for _fund in _constituent_funds:
-            _fi = selected_funds.index(_fund)
-
             # fund_stats（分析期間ベース）
             _fs         = fund_stats.loc[_fund]
             _ret_period = _fs['年率リターン'] * 100   # float % 値
@@ -992,12 +986,12 @@ def render_report_panel(
                 else:                       out.append('background-color: #f3f4f6')
             return out
 
-        _disp_cols = [
-            'リターン\n分析期間(%)', 'リターン\n設定来(%)',
-            '年率リスク\n分析期間(%)', 'シャープ\n分析期間',
-            '最大DD\n設定来(%)', 'コア相関\n分析期間', '月次勝率\n設定来(%)'
-        ]
-
+        # [Fix A] _styled_summ を構築して st.dataframe に渡す。
+        # 旧実装は _styled_summ を生成後に _summ_df（生 DataFrame）を渡していたため、
+        # キャプションに記載した色分け（緑/赤/🟢🟡🔴）が画面に反映されていなかった。
+        # Styler を直接渡す場合は column_config と併用不可のため、
+        # フォーマットは Styler の .format() で完結させる。
+        # （_disp_cols / _col_cfg は Styler 渡しに切り替えたため不要となり削除）
         _styled_summ = (
             _summ_df.style
             .apply(_sc_row, axis=1)
@@ -1023,31 +1017,12 @@ def render_report_panel(
             ])
         )
 
-        # column_config で float 認識 & ソート可能にする
-        _col_cfg = {
-            'リターン\n分析期間(%)' : st.column_config.NumberColumn(
-                "リターン\n分析期間(%)", format="%.1f%%", help="分析期間ベースの年率リターン"),
-            'リターン\n設定来(%)'   : st.column_config.NumberColumn(
-                "リターン\n設定来(%)",  format="%.1f%%", help="設定来（全期間）年率リターン"),
-            '年率リスク\n分析期間(%)': st.column_config.NumberColumn(
-                "年率リスク\n分析期間(%)", format="%.1f%%", help="分析期間ベースの年率ボラティリティ"),
-            'シャープ\n分析期間'    : st.column_config.NumberColumn(
-                "シャープ\n分析期間",   format="%.2f",   help="分析期間シャープレシオ（1.0超=優秀）"),
-            '最大DD\n設定来(%)'     : st.column_config.NumberColumn(
-                "最大DD\n設定来(%)",    format="%.1f%%", help="設定来最大ドローダウン"),
-            'コア相関\n分析期間'    : st.column_config.NumberColumn(
-                "コア相関\n分析期間",   format="%.2f",   help="コアファンドとの相関（0.3〜0.7が理想）"),
-            '月次勝率\n設定来(%)'   : st.column_config.NumberColumn(
-                "月次勝率\n設定来(%)",  format="%.0f%%", help="設定来月次プラス比率"),
-        }
-
         st.dataframe(
-            _summ_df,
+            _styled_summ,
             use_container_width=True,
-            column_config=_col_cfg,
         )
         st.caption(
-            f"🔵 コアファンド「{core_fund}」行は青ハイライト（column_configによりソート可能）。"
+            f"🔵 コアファンド「{core_fund}」行は青ハイライト。"
             "　リターン: +10%超=濃緑 / +3〜10%=緑 / 0〜3%=薄緑 / マイナス=赤。"
             "　シャープ: 🟢1.0超 / 🟡0.5-1.0 / 🔴0.5未満。"
             "　最大DD: 🟢-10%以内 / 🟡-10〜-25% / 🔴-25%超。"
