@@ -1078,7 +1078,7 @@ if uploaded_file is not None:
     # 【修正前の問題】 pct_change().dropna() は how='any'（デフォルト）のため、
     #   valid_funds の中で設定来の最も短いファンドの開始日に全体が切り詰められた。
     #   例: 15年選択でも150ヶ月しかないファンドが1本混在すれば全体が150ヶ月になる。
-    _df_pct_all = df_filtered[fund_cols].pct_change().iloc[1:]   # 先頭NaN行を除去
+    _df_pct_all = df_filtered[fund_cols].pct_change(fill_method=None).iloc[1:]   # 先頭NaN行を除去
     _core_mask  = _df_pct_all[core_fund].notna()                 # コア有効期間マスク
     _df_core    = _df_pct_all[_core_mask]                        # コア期間ベース（months行）
 
@@ -1270,6 +1270,8 @@ if uploaded_file is not None:
     # O-04 修正：各プロファイルの下限可行性チェック。
     # コア最小値 + サテライト本数 × min_individual > 1.0 になると最適化が収束しない。
     # 問題がある場合は min_individual を自動調整し、警告を表示する。
+    # [NEW-ISSUE-1修正] _n_satellite が 0 の場合（ファンドが1本のみ）のゼロ除算を防ぐ。
+    # portfolio_utils.optimize_portfolio() 側と同じ max(..., 1) ガードを追加。
     _n_satellite = len(selected_funds) - 1  # コア除いたサテライト本数
     for _pname, _pcfg in optimization_configs.items():
         _core_min = _pcfg["core_range"][0]
@@ -1277,7 +1279,8 @@ if uploaded_file is not None:
         _feasibility = _core_min + _n_satellite * _min_ind
         if _feasibility > 1.0 + 1e-6:
             # 制約可行のための最大 min_individual を逆算
-            _safe_min = max(0.0, (1.0 - _core_min) / _n_satellite - 1e-6)
+            # max(..., 1) でゼロ除算を防止（サテライト0本は通常起こらないが安全策として）
+            _safe_min = max(0.0, (1.0 - _core_min) / max(_n_satellite, 1) - 1e-6)
             optimization_configs[_pname]["min_individual"] = _safe_min
             if st.session_state.get('show_min_adj_warning', False):
                 st.warning(
