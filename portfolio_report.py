@@ -15,7 +15,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
-from portfolio_charts import _donut_svg, _badge
+from portfolio_charts import donut_svg, badge  # M-3: 公開 API に昇格した名前で import
 from portfolio_utils import PortfolioAnalyzer
 
 # ── デザインシステム定数 ───────────────────────────────────────
@@ -351,7 +351,7 @@ def render_report_panel(
             ret_sign   = "+" if ret_ >= 0 else ""
             sr_color   = "#1e8449" if sr_ >= 1.0 else ("#d35400" if sr_ >= 0.5 else "#c0392b")
             bar_w      = min(vol_ / 20 * 100, 100)
-            donut_     = _donut_svg(core_w_pct, "rgba(255,255,255,0.9)")
+            donut_     = donut_svg(core_w_pct, "rgba(255,255,255,0.9)")
             cr_min, cr_max = pf["config"]["core_range"]
             core_range_str = f"{int(cr_min*100)}–{int(cr_max*100)}%"
 
@@ -505,7 +505,7 @@ def render_report_panel(
                 _rp_nf   = int((_rp_w > 0.01).sum())
                 _rp_ret_sign = "+" if _rp_ret >= 0 else ""
                 _rp_sr_color = "#1e8449" if _rp_sr >= 1.0 else ("#d35400" if _rp_sr >= 0.5 else "#c0392b")
-                _rp_donut    = _donut_svg(_rp_core, "rgba(255,255,255,0.9)")
+                _rp_donut    = donut_svg(_rp_core, "rgba(255,255,255,0.9)")
                 st.markdown(
                     '<div style="margin-top:16px;padding:6px 0 4px 0;'
                     'border-top:1px solid rgba(99,102,241,0.25);">'
@@ -601,18 +601,18 @@ def render_report_panel(
                 st.markdown(f'<div style="font-size:0.78rem;font-weight:700;color:{c_};margin:10px 0 4px;">{pname}</div>', unsafe_allow_html=True)
                 badges_html = (
                     '<div class="metric-badges-wrap">'
-                    + _badge("年率リターン", f"{ret_sign}{ret_:.2f}%", "CAGR", c_)
-                    + _badge("年平均リスク", f"{vol_:.2f}%",           "リスク水準", c_)
-                    + _badge("シャープ",     f'<span style="color:{sr_color}">{sr_:.3f}</span>', "1.0以上が優秀", c_)
-                    + _badge("ソルティノ",   f"{so_:.3f}",              "下方リスク調整", c_)
-                    + _badge("最大DD",       f'<span style="color:#c0392b">{dd_:.2f}%</span>', "最悪ケース", c_)
-                    + _badge("カルマー比率", f"{cm_:.3f}",              "DD比リターン", c_)
-                    + _badge("Omega比率",    f"{om_:.3f}",              "利益/損失比率", c_)
-                    + _badge("Ulcer指数",    f"{ul_:.2f}%",             "DD累積ペナルティ", c_)
-                    + _badge("Martin比率",   f"{mr_:.3f}",              "リターン÷Ulcer", c_)
-                    + _badge("GL比率",       f"{gl_:.3f}",              "平均利益÷平均損失", c_)
-                    + _badge("コア比率",     f"{cw_:.1f}%",             "コアファンド", c_)
-                    + _badge("月次勝率",     f"{mwr_:.1f}%",            "上昇月の割合", c_)
+                    + badge("年率リターン", f"{ret_sign}{ret_:.2f}%", "CAGR", c_)
+                    + badge("年平均リスク", f"{vol_:.2f}%",           "リスク水準", c_)
+                    + badge("シャープ",     f'<span style="color:{sr_color}">{sr_:.3f}</span>', "1.0以上が優秀", c_)
+                    + badge("ソルティノ",   f"{so_:.3f}",              "下方リスク調整", c_)
+                    + badge("最大DD",       f'<span style="color:#c0392b">{dd_:.2f}%</span>', "最悪ケース", c_)
+                    + badge("カルマー比率", f"{cm_:.3f}",              "DD比リターン", c_)
+                    + badge("Omega比率",    f"{om_:.3f}",              "利益/損失比率", c_)
+                    + badge("Ulcer指数",    f"{ul_:.2f}%",             "DD累積ペナルティ", c_)
+                    + badge("Martin比率",   f"{mr_:.3f}",              "リターン÷Ulcer", c_)
+                    + badge("GL比率",       f"{gl_:.3f}",              "平均利益÷平均損失", c_)
+                    + badge("コア比率",     f"{cw_:.1f}%",             "コアファンド", c_)
+                    + badge("月次勝率",     f"{mwr_:.1f}%",            "上昇月の割合", c_)
                     + '</div>'
                 )
                 st.markdown(badges_html, unsafe_allow_html=True)
@@ -938,14 +938,17 @@ def render_report_panel(
 
             # ── 有効フロンティア（キャッシュ付き）────────────────────────
             @st.cache_data(show_spinner=False)
-            def _cached_efficient_frontier(_rets, _funds_tuple, _lw: bool):
-                """有効フロンティアをキャッシュ付きで計算"""
-                _az = PortfolioAnalyzer(_rets, use_ledoit_wolf=_lw)
+            def _cached_efficient_frontier(_rets, _funds_tuple, _lw: bool, _rf: float):
+                """有効フロンティアをキャッシュ付きで計算。
+                M-1: risk_free_rate を渡し、フロンティア上のシャープレシオも
+                     FundScreener / optimize_portfolios と同一基準に統一する。
+                """
+                _az = PortfolioAnalyzer(_rets, risk_free_rate=_rf, use_ledoit_wolf=_lw)
                 return _az.calculate_efficient_frontier(n_points=35)
 
             try:
                 _ef_df = _cached_efficient_frontier(
-                    returns_selected, tuple(selected_funds), _use_lw
+                    returns_selected, tuple(selected_funds), _use_lw, rf_rate
                 ).dropna(subset=['ボラティリティ', 'リターン_CAGR'])  # 両列有効な点のみ描画
                 if not _ef_df.empty:
                     # 実現系列ベースCAGRを直接参照（近似式 μ-σ²/2 の上振れバイアスを排除）
