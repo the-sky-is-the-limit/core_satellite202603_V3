@@ -926,6 +926,32 @@ def _render_tab_constituents(
     st.markdown("### 構成銘柄詳細分析")
     st.info("💡 ポートフォリオを構成する各ファンドについて、オリジナルデータ全期間での詳細分析を表示します")
 
+    # [ISSUE-4修正] calc_annualized_return / color_returns を for ループ外（関数スコープ）に移動
+    # 旧実装ではファンド数分（最大30本程度）のイテレーションごとに再定義されていた。
+    # ループ外に出しても動作は完全に同一だが、可読性・保守性が向上する。
+
+    def calc_annualized_return(returns_series, periods):
+        """期間別の年率リターンを計算"""
+        if len(returns_series) < periods:
+            return np.nan
+        period_returns = returns_series.iloc[-periods:]
+        cum_return = (1 + period_returns).prod() - 1
+        annual_return = (1 + cum_return) ** (12 / periods) - 1
+        return annual_return * 100
+
+    def color_returns(val):
+        """リターン値に色付け"""
+        if isinstance(val, str) and '%' in val:
+            try:
+                num_val = float(val.replace('%', ''))
+                if num_val > 0:
+                    return 'background-color: #d4edda; color: #155724'
+                elif num_val < 0:
+                    return 'background-color: #f8d7da; color: #721c24'
+            except Exception:
+                pass
+        return ''
+
     # 構成銘柄を特定（ウェイト0.5%以上）
     constituent_funds_analysis = [(selected_funds[i], selected_weights[i]) 
                                  for i in range(len(selected_funds)) 
@@ -963,20 +989,22 @@ def _render_tab_constituents(
                     bench_prices_full = bench_prices_full.loc[common_idx]
 
                 # データ期間情報
-                st.caption(f"📅 データ期間: {fund_prices_full.index[0].strftime('%Y年%m月')} ～ {fund_prices_full.index[-1].strftime('%Y年%m月')} （{len(fund_prices_full)}ヶ月）")
+                # [ISSUE-5修正] ベンチマーク指定時はファンドのデータ期間がベンチマーク開始月に
+                # 切り詰められることをキャプションで明示する。旧実装はデータ期間の変化に
+                # 無言だったため、ベンチマークより設定来が長いファンドで「設定来リターン」が
+                # ベンチマーク期間基準に短縮されていることに気づきにくかった。
+                _period_note = (
+                    f"　※ベンチマーク（{benchmark}）と期間を揃えています"
+                    if benchmark != "なし" else ""
+                )
+                st.caption(
+                    f"📅 データ期間: {fund_prices_full.index[0].strftime('%Y年%m月')} ～ "
+                    f"{fund_prices_full.index[-1].strftime('%Y年%m月')} "
+                    f"（{len(fund_prices_full)}ヶ月）{_period_note}"
+                )
 
                 # リターン計算
                 fund_returns_full = fund_prices_full.pct_change().dropna()
-
-                # 各期間のリターン計算関数
-                def calc_annualized_return(returns_series, periods):
-                    """期間別の年率リターンを計算"""
-                    if len(returns_series) < periods:
-                        return np.nan
-                    period_returns = returns_series.iloc[-periods:]
-                    cum_return = (1 + period_returns).prod() - 1
-                    annual_return = (1 + cum_return) ** (12 / periods) - 1
-                    return annual_return * 100
 
                 # リターン表作成
                 periods_dict = {
@@ -1083,20 +1111,6 @@ def _render_tab_constituents(
                 with col1:
                     st.markdown("##### 📊 リターン（年率）")
                     return_df = pd.DataFrame(return_data)
-
-                    # スタイリング付きで表示
-                    def color_returns(val):
-                        """リターン値に色付け"""
-                        if isinstance(val, str) and '%' in val:
-                            try:
-                                num_val = float(val.replace('%', ''))
-                                if num_val > 0:
-                                    return 'background-color: #d4edda; color: #155724'
-                                elif num_val < 0:
-                                    return 'background-color: #f8d7da; color: #721c24'
-                            except:
-                                pass
-                        return ''
 
                     styled_return_df = return_df.style.map(
                         color_returns,
