@@ -185,8 +185,15 @@ def build_report_data(
         core_sharpe     = core_stats_fs['シャープレシオ']
         core_volatility = core_stats_fs['年率ボラ']
         core_return     = core_stats_fs['年率リターン']
-
-
+    # ── 計算済みデータを dict で返す ──────────────────────────────
+    return {
+        "comparison_df":         comparison_df,
+        "_comparison_col_cfg":   _comparison_col_cfg,
+        "core_stats_fs":         core_stats_fs,
+        "core_sharpe":           core_sharpe,
+        "core_volatility":       core_volatility,
+        "core_return":           core_return,
+    }
 
 def render_report_panel(
     ctx: dict,
@@ -991,7 +998,8 @@ def render_report_panel(
                 )
                 bars_html += '</div>'
                 st.markdown(bars_html, unsafe_allow_html=True)
-
+    # ── allocation_df_numeric を返す（render_export_section で使用）──
+    return allocation_df_numeric
 
 def render_export_section(
     portfolios, selected_funds,
