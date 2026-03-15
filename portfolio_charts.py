@@ -368,7 +368,7 @@ def _render_client_view(
     </script>
     </body>
     </html>"""
-    _components.html(_client_html, height=1150, scrolling=True)
+    _components.html(_client_html, height=1200, scrolling=True)
 
 
 
