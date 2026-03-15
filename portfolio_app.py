@@ -6,6 +6,14 @@ import plotly.express as px
 from datetime import datetime
 from portfolio_utils import PortfolioAnalyzer, FundScreener
 from portfolio_charts import render_profile_detail, _donut_svg, _badge
+from portfolio_data import (
+    load_fund_data,
+    compute_fund_overview_table,
+    build_overview_cache_key,
+    prep_overview_df,
+    make_overview_col_config,
+    style_overview_table,
+)
 import io
 import hashlib
 import json
@@ -680,19 +688,9 @@ if uploaded_file is not None:
             st.session_state.pop(_key, None)
         st.session_state['_last_file_id'] = _file_id
 
-    # データ読み込み
-    # D-03 修正：file_id を明示的なキャッシュキー引数として渡す。
-    # UploadedFile オブジェクト単体ではハッシュが変わらない場合があるため、
-    # ファイル名+サイズを文字列化した file_id でキャッシュを確実に無効化する。
-    @st.cache_data
-    def load_data(file, file_id: str):  # noqa: ARG001（file_id はキャッシュキー専用）
-        df = pd.read_excel(file)
-        df['Date'] = pd.to_datetime(df['Date'])
-        df = df.set_index('Date').sort_index()
-        return df
-
+    # データ読み込み（load_fund_data は portfolio_data で管理）
     try:
-        df_price = load_data(uploaded_file, _file_id)
+        df_price = load_fund_data(uploaded_file, _file_id)
     except Exception as _load_err:
         # Section 5: エラー種別「データ形式不正」
         st.markdown(
@@ -702,228 +700,6 @@ if uploaded_file is not None:
             unsafe_allow_html=True
         )
         st.stop()
-    
-    # ─────────────────────────────────────────────────────────────
-    # 全ファンド概観テーブル計算関数
-    # ─────────────────────────────────────────────────────────────
-    @st.cache_data(show_spinner=False)
-    def compute_fund_overview_table(cache_key: str, _df_price: pd.DataFrame,
-                                    fund_cols_tuple: tuple, core_fund: str,
-                                    analysis_months: int,
-                                    rf_rate: float = 0.005) -> pd.DataFrame:
-        """
-        全ファンドの多期間リターン・リスク・相関サマリーテーブルを計算。
-        
-        ・マルチピリオドリターン : 1年/3年/5年/10年/設定来（年率CAGR）
-        ・リスク指標             : 設定来ボラティリティ、最大DD、シャープレシオ、月次勝率
-        ・コア相関               : 設定来相関、選択分析期間の相関、ローリング相関安定性
-        
-        Parameters
-        ----------
-        cache_key      : df_price の内容変化を検知するためのハッシュ文字列
-        _df_price      : 基準価格DataFrame（全期間）
-        fund_cols_tuple: 対象ファンド列名のタプル
-        core_fund      : コアファンド名（相関計算の基準）
-        analysis_months: 選択中の分析期間（月数）
-        """
-        fund_cols = list(fund_cols_tuple)
-        
-        # コアファンドの全期間リターン系列
-        core_px_full = _df_price[core_fund].dropna()
-        core_ret_full = core_px_full.pct_change().dropna()
-        
-        # コアファンドの分析期間リターン系列
-        # pct_change()で1本消費されるため、必要月次リターン数+1本の価格データを取得する
-        core_px_period = _df_price[core_fund].iloc[-(analysis_months + 1):].dropna()
-        core_ret_period = core_px_period.pct_change().dropna()
-        
-        def cagr(ret_series: pd.Series, months: int):
-            """指定月数の年率CAGR。データ不足はNoneを返す。"""
-            if len(ret_series) < months:
-                return None
-            r = ret_series.iloc[-months:]
-            cum = (1 + r).prod() - 1
-            return (1 + cum) ** (12.0 / months) - 1
-        
-        rows = []
-        for fund in fund_cols:
-            prices = _df_price[fund].dropna()
-            if len(prices) < 13:   # 最低1年分（12ヶ月リターン + 1ヶ月）
-                continue
-            
-            ret = prices.pct_change().dropna()
-            n = len(ret)
-            data_years = round(n / 12.0, 1)
-            
-            # ── マルチピリオドリターン ──────────────────────────────
-            r1y   = cagr(ret, 12)
-            r3y   = cagr(ret, 36)
-            r5y   = cagr(ret, 60)
-            r10y  = cagr(ret, 120)
-            r_all = cagr(ret, n)        # 設定来
-            
-            # ── 設定来リスク指標 ────────────────────────────────────
-            vol   = ret.std(ddof=1) * np.sqrt(12)
-            # 無リスク金利を控除したシャープレシオ（rf_rate=0.0のときは従来と同値）
-            sharpe = ((r_all - rf_rate) / vol) if (r_all is not None and vol > 1e-6) else None
-
-            # ① 最大DD: 先頭に 1.0 を付加して期初損失を正確に捕捉（_calculate_statistics と統一）
-            # 旧実装 cum_ret.cummax() は第1期の損失を DD=0 と誤計上する可能性があった。
-            cum_np   = np.concatenate([[1.0], (1 + ret.values).cumprod()])
-            rmax_np  = np.maximum.accumulate(cum_np)
-            dd_np    = (cum_np - rmax_np) / rmax_np
-            max_dd   = float(dd_np[1:].min())
-            
-            win_rate = (ret > 0).sum() / n     # 月次勝率
-            
-            # ── コアファンドとの相関 ────────────────────────────────
-            # 設定来相関
-            idx_full = ret.index.intersection(core_ret_full.index)
-            corr_full = (
-                ret[idx_full].corr(core_ret_full[idx_full])
-                if len(idx_full) >= 12 else None
-            )
-            
-            # 分析期間相関
-            idx_period = ret.index.intersection(core_ret_period.index)
-            corr_period = (
-                ret[idx_period].corr(core_ret_period[idx_period])
-                if len(idx_period) >= 6 else None
-            )
-            
-            # 相関安定性：12ヶ月ローリング相関の標準偏差
-            # σが小さいほど相関が安定（分散効果が予測しやすい）
-            # min_periods=12 を明示して、不完全ウィンドウによるゼロ混入を防ぐ
-            if len(idx_full) >= 24:
-                rolling_c = (
-                    ret[idx_full]
-                    .rolling(12, min_periods=12)
-                    .corr(core_ret_full[idx_full])
-                )
-                corr_stability = rolling_c.dropna().std(ddof=1) if rolling_c.dropna().shape[0] >= 2 else None
-            else:
-                corr_stability = None
-            
-            rows.append({
-                'ファンド名'           : fund,
-                'データ期間(年)'       : data_years,
-                '1年リターン'          : r1y,
-                '3年リターン(年率)'    : r3y,
-                '5年リターン(年率)'    : r5y,
-                '10年リターン(年率)'   : r10y,
-                '設定来リターン(年率)' : r_all,
-                '設定来ボラ'           : vol,
-                'シャープ(設定来)'     : sharpe,
-                '最大DD(設定来)'       : max_dd,
-                '月次勝率'             : win_rate,
-                'コア相関(設定来)'     : corr_full,
-                f'コア相関({analysis_months//12}年)'  : corr_period,
-                '相関安定性(σ)'        : corr_stability,
-            })
-        
-        return pd.DataFrame(rows).set_index('ファンド名')
-    
-    def _make_overview_col_config(columns) -> dict:
-        """
-        float の overview DataFrame 用 column_config を生成する。
-        - pct列は x100 済みの値を "%.1f%%" でフォーマット（ソート可能）
-        - 符号付き列（リターン/最大DD）は "+%.1f%%" でフォーマット
-        - 相関・シャープ・期間は "%.2f" / "%.1f"
-        """
-        # \n を使わず空白で折り返しラベルを定義（dict リテラル内の改行エラー回避）
-        pct_signed_label = {
-            '1年リターン':        '1年 リターン(%)',
-            '3年リターン(年率)':  '3年 リターン(%)',
-            '5年リターン(年率)':  '5年 リターン(%)',
-            '10年リターン(年率)': '10年 リターン(%)',
-            '設定来リターン(年率)':'設定来 リターン(%)',
-            '最大DD(設定来)':     '最大DD 設定来(%)',
-        }
-        pct_unsigned_label = {
-            '設定来ボラ': '設定来 ボラ(%)',
-            '月次勝率':   '月次 勝率(%)',
-        }
-        cfg = {}
-        for col in columns:
-            if col in pct_signed_label:
-                cfg[col] = st.column_config.NumberColumn(
-                    pct_signed_label[col], format="%+.1f%%")
-            elif col in pct_unsigned_label:
-                cfg[col] = st.column_config.NumberColumn(
-                    pct_unsigned_label[col], format="%.1f%%")
-            elif col == 'シャープ(設定来)':
-                cfg[col] = st.column_config.NumberColumn(
-                    'シャープ(設定来)', format="%.2f")
-            elif col == 'データ期間(年)':
-                cfg[col] = st.column_config.NumberColumn(
-                    '期間(年)', format="%.1f")
-            elif 'コア相関' in col or '相関安定性' in col:
-                cfg[col] = st.column_config.NumberColumn(col, format="%.2f")
-        return cfg
-
-    def _prep_overview_df(df_raw: pd.DataFrame) -> pd.DataFrame:
-        """
-        overview_raw（小数）から表示・ソート用 DataFrame を作成する。
-        % 列を ×100 した float のまま返す（文字列変換なし）。
-        → st.dataframe の列ソートが正しく機能する。
-        """
-        pct_cols = [
-            '1年リターン', '3年リターン(年率)', '5年リターン(年率)',
-            '10年リターン(年率)', '設定来リターン(年率)',
-            '設定来ボラ', '最大DD(設定来)', '月次勝率',
-        ]
-        df = df_raw.copy()
-        for col in pct_cols:
-            if col in df.columns:
-                df[col] = df[col] * 100   # float のまま ×100（ソート有効）
-        return df
-
-    def style_overview_table(df_raw: pd.DataFrame,
-                              core_fund: str,
-                              selected_funds: list = None) -> "pd.io.formats.style.Styler":
-        """
-        選定ファンド詳細統計など小テーブル向け：Styler で行ハイライトのみ適用。
-        （大テーブルは _prep_overview_df + _make_overview_col_config を使用）
-        """
-        df_disp = _prep_overview_df(df_raw)
-
-        pct_signed_cols = [
-            '1年リターン', '3年リターン(年率)', '5年リターン(年率)',
-            '10年リターン(年率)', '設定来リターン(年率)', '最大DD(設定来)',
-        ]
-        pct_unsigned_cols = ['設定来ボラ', '月次勝率']
-        fmt = {}
-        for col in pct_signed_cols:
-            if col in df_disp.columns:
-                fmt[col] = lambda x: f"{x:+.1f}%" if pd.notna(x) else "—"
-        for col in pct_unsigned_cols:
-            if col in df_disp.columns:
-                fmt[col] = lambda x: f"{x:.1f}%" if pd.notna(x) else "—"
-        for col in ['シャープ(設定来)', 'データ期間(年)']:
-            if col in df_disp.columns:
-                fmt[col] = lambda x: f"{x:.2f}" if pd.notna(x) else "—"
-        corr_cols = [c for c in df_disp.columns if 'コア相関' in c or '相関安定性' in c]
-        for col in corr_cols:
-            fmt[col] = lambda x: f"{x:.2f}" if pd.notna(x) else "—"
-
-        def row_style(row):
-            name = row.name
-            if name == core_fund:
-                return ['background-color: #dbeafe; font-weight: bold'] * len(row)
-            if selected_funds and name in selected_funds and name != core_fund:
-                return ['background-color: #fef9c3'] * len(row)
-            return [''] * len(row)
-
-        styled = df_disp.style.apply(row_style, axis=1)
-        if fmt:
-            styled = styled.format(fmt, na_rep="—")
-        styled = styled.set_properties(**{'text-align': 'right'})
-        styled = styled.set_table_styles([
-            {'selector': 'th.col_heading', 'props': 'text-align: center; font-size: 0.82em;'},
-            {'selector': 'th.row_heading', 'props': 'text-align: left; font-size: 0.82em;'},
-            {'selector': 'td', 'props': 'font-size: 0.82em; padding: 3px 8px;'},
-        ])
-        return styled
     
     # 通貨列を除外（それ以外は全てファンド候補として扱う）
     currency_keywords = ['USD-JPY', 'EUR-JPY', 'GBP-JPY', 'CHF-JPY', 'AUD-JPY']
@@ -1041,14 +817,7 @@ if uploaded_file is not None:
     rf_rate_annual = st.session_state.get('rf_rate', 0.005)
 
     with st.spinner("サマリーテーブルを計算中..."):
-        # ⑦ キャッシュキーに先頭日も含め、データの先頭変化（古いファンド削除等）を確実に検知する
-        _key_src = (
-            f"{df_price.index[0].strftime('%Y%m')}_{df_price.index[-1].strftime('%Y%m')}"
-            f"_{months_param}"
-            f"_{rf_rate_annual:.4f}"
-            f"_{','.join(sorted(df_price.columns))}"
-        )
-        _cache_key = hashlib.md5(_key_src.encode()).hexdigest()[:12]
+        _cache_key = build_overview_cache_key(df_price, months_param, rf_rate_annual)
         overview_raw = compute_fund_overview_table(
             _cache_key,
             df_price,
@@ -1215,10 +984,10 @@ if uploaded_file is not None:
             _perf_cols  = ['データ期間(年)', '1年リターン', '3年リターン(年率)',
                            '5年リターン(年率)', '10年リターン(年率)', '設定来リターン(年率)']
             _perf_avail = [c for c in _perf_cols if c in overview_raw.columns]
-            _perf_df    = _prep_overview_df(overview_raw[_perf_avail])
+            _perf_df    = prep_overview_df(overview_raw[_perf_avail])
             st.dataframe(
                 _perf_df,
-                column_config=_make_overview_col_config(_perf_df.columns),
+                column_config=make_overview_col_config(_perf_df.columns),
                 use_container_width=True, height=400,
             )
             st.caption("💡 列ヘッダークリックでソート可。年率CAGR表示。🔵コアファンド行は凡例のみ（ハイライトは選定後）")
@@ -1227,10 +996,10 @@ if uploaded_file is not None:
             _risk_cols  = ['データ期間(年)', '設定来リターン(年率)', '設定来ボラ',
                            'シャープ(設定来)', '最大DD(設定来)', '月次勝率']
             _risk_avail = [c for c in _risk_cols if c in overview_raw.columns]
-            _risk_df    = _prep_overview_df(overview_raw[_risk_avail])
+            _risk_df    = prep_overview_df(overview_raw[_risk_avail])
             st.dataframe(
                 _risk_df,
-                column_config=_make_overview_col_config(_risk_df.columns),
+                column_config=make_overview_col_config(_risk_df.columns),
                 use_container_width=True, height=400,
             )
             st.caption("💡 列ヘッダークリックでソート可。最大DD：-10%以内が理想、-25%超は要注意。シャープ：1.0超が優秀。")
@@ -1239,10 +1008,10 @@ if uploaded_file is not None:
             _corr_cols  = ['データ期間(年)', '設定来リターン(年率)', '設定来ボラ',
                            'コア相関(設定来)', f'コア相関({months_param//12}年)', '相関安定性(σ)']
             _corr_avail = [c for c in _corr_cols if c in overview_raw.columns]
-            _corr_df    = _prep_overview_df(overview_raw[_corr_avail])
+            _corr_df    = prep_overview_df(overview_raw[_corr_avail])
             st.dataframe(
                 _corr_df,
-                column_config=_make_overview_col_config(_corr_df.columns),
+                column_config=make_overview_col_config(_corr_df.columns),
                 use_container_width=True, height=400,
             )
             st.caption(
