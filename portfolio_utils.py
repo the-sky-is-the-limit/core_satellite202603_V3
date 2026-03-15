@@ -970,14 +970,16 @@ class PortfolioAnalyzer:
             starts.append(_make_feasible(w_rand))
 
         # ── 目的関数の勾配（min_cvar のみ解析的サブグラジェントを設定）──────
-        # 他の objective_type は数値微分で十分収束するため None のまま。
-        # min_cvar だけは np.sort 由来の非滑らかさを argpartition で近似して渡す。
-        _jac_fn = None
+        # 他の objective_type は数値微分で十分収束するため勾配関数は渡さない（None）。
+        # min_cvar だけは np.sort 由来の非滑らかさを argpartition で近似した
+        # 解析的サブグラジェントを定義して収束を安定させる。
         if objective_type == 'min_cvar':
             def _jac_fn(w):
                 port_r    = _ret_matrix @ w
                 idx_worst = np.argpartition(port_r, _k_cvar)[:_k_cvar]
                 return -_ret_matrix[idx_worst, :].mean(axis=0)
+        else:
+            _jac_fn = None
 
         # ── 一次最適化（マルチスタート）──────────────────────────────────────
         best_result = None
