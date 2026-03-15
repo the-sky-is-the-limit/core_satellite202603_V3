@@ -801,7 +801,7 @@ if uploaded_file is not None:
     st.markdown(
         f'<div style="font-size:0.7rem;color:rgba(179,144,74,0.75);margin-top:4px;margin-bottom:0;'
         f'padding:6px 10px;background:rgba(179,144,74,0.06);border-radius:6px;">'
-        f'🎯 <b style="color:#d4af6a;">{core_fund_param}</b>'
+        f'■ <b style="color:#d4af6a;">{core_fund_param}</b>'
         f'&ensp;·&ensp; 期間 <b style="color:#d4af6a;">{selected_period}</b>'
         f'&ensp;·&ensp; ベンチマーク <b style="color:#d4af6a;">{benchmark_param}</b>'
         f'</div>',
@@ -1200,7 +1200,7 @@ if uploaded_file is not None:
             box-shadow:0 1px 4px rgba(0,0,0,0.08);">
   <div style="background:linear-gradient(135deg,#b3904a,#8a6a30);border-radius:6px;
               width:34px;height:34px;display:flex;align-items:center;justify-content:center;
-              font-size:17px;flex-shrink:0;box-shadow:0 2px 8px rgba(179,144,74,0.4);">🎯</div>
+              font-size:17px;flex-shrink:0;box-shadow:0 2px 8px rgba(179,144,74,0.4);">■</div>
   <div style="font-size:0.95rem;font-weight:800;color:#d4af6a;letter-spacing:0.04em;line-height:1.2;">
     5段階リスクプロファイル別ポートフォリオ
   </div>
@@ -1711,7 +1711,7 @@ else:
                 border-radius:10px;padding:14px 16px;">
       <div style="font-size:0.6rem;font-weight:800;letter-spacing:0.12em;color:rgba(179,144,74,0.7);
                   margin-bottom:8px;">STEP 3</div>
-      <div style="font-size:0.85rem;margin-bottom:4px;">🎯 結果確認</div>
+      <div style="font-size:0.85rem;margin-bottom:4px;">■ 結果確認</div>
       <div style="font-size:0.68rem;color:rgba(255,255,255,0.4);line-height:1.5;">
         5段階プロファイル・詳細分析・Excel出力まで自動生成
       </div>
