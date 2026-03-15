@@ -7,6 +7,7 @@ portfolio_app.py から import して使用する。
 修正（v1.1.0 — 2026-03）:
   _rank_asc/_rank_desc/_profile_commentary を for ループ外に正しく配置。
 """
+import hashlib
 import io
 from datetime import datetime
 
@@ -468,7 +469,7 @@ def render_report_panel(
         # ── [改善F] リスクパリティ カード（サイドバーチェック時のみ表示） ──
         if _show_rp:
             @st.cache_data(show_spinner=False)
-            def _compute_risk_parity(_rets, _funds_tuple, _core_name, _lw: bool):
+            def _compute_risk_parity(_rets, _funds_tuple, _core_name, _lw: bool, data_hash: str = ""):
                 """リスクパリティ最適化（バランス型設定で実行）"""
                 _az  = PortfolioAnalyzer(_rets, use_ledoit_wolf=_lw)
                 _ci  = list(_funds_tuple).index(_core_name)
@@ -491,11 +492,15 @@ def render_report_panel(
                 return _w, _st, float(_rc_cv)
 
             try:
+                _ret_hash = hashlib.sha256(
+                    pd.util.hash_pandas_object(returns_selected, index=True).values.tobytes()
+                ).hexdigest()[:16]
                 _rp_w, _rp_st, _rp_rc_cv = _compute_risk_parity(
                     returns_selected,
                     tuple(selected_funds),
                     core_fund,
                     _use_lw,
+                    _ret_hash,
                 )
                 _rp_ret  = _rp_st['年率リターン'] * 100
                 _rp_vol  = _rp_st['年率ボラティリティ'] * 100
@@ -948,7 +953,7 @@ def render_report_panel(
 
             # ── 有効フロンティア（キャッシュ付き）────────────────────────
             @st.cache_data(show_spinner=False)
-            def _cached_efficient_frontier(_rets, _funds_tuple, _rf: float):
+            def _cached_efficient_frontier(_rets, _funds_tuple, _rf: float, data_hash: str = ""):
                 """有効フロンティアをキャッシュ付きで計算。
                 [バグ①②修正] ボラスイープ型（固定vol→最大μ）でCAGR上限を正しく保証。
                 フロンティア内部でサンプル共分散を使用するため use_ledoit_wolf 引数は不要。
@@ -957,8 +962,11 @@ def render_report_panel(
                 return _az.calculate_efficient_frontier(n_points=35)
 
             try:
+                _ef_hash = hashlib.sha256(
+                    pd.util.hash_pandas_object(returns_selected, index=True).values.tobytes()
+                ).hexdigest()[:16]
                 _ef_df = _cached_efficient_frontier(
-                    returns_selected, tuple(selected_funds), rf_rate
+                    returns_selected, tuple(selected_funds), rf_rate, _ef_hash
                 ).dropna(subset=['ボラティリティ', 'リターン_CAGR'])  # 両列有効な点のみ描画
                 if not _ef_df.empty:
                     # 実現系列ベースCAGRを直接参照（散布図Y軸と同定義）
