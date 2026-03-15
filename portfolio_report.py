@@ -195,9 +195,15 @@ def render_report_panel(
     portfolios, selected_funds, core_fund, core_idx,
     fund_stats, returns_selected, rf_rate,
     show_rp: bool = False,
+    overview_raw=None,
+    use_lw: bool = False,
 ):
     """統合レポートパネル（プロファイルカード＋3タブ）を描画する。"""
-    _show_rp = show_rp  # portfolio_app.py のサイドバー値をローカル変数にバインド
+    # portfolio_app.py のサイドバー値をローカル変数にバインド
+    _show_rp     = show_rp
+    _use_lw      = use_lw
+    if overview_raw is None:
+        overview_raw = pd.DataFrame()
     # ─── プロファイルカード ───────────────────────────────────
     # ─── 統合レポートパネル（3タブ構成: 比較/構成/リスク・リターン）──────
 
