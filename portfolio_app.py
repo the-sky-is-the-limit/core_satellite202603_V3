@@ -649,7 +649,7 @@ st.markdown("""
       <span style="background:linear-gradient(135deg,#b3904a,#8a6a30);color:#0f172a;
                    border-radius:4px;padding:2px 8px;font-size:0.65rem;font-weight:800;
                    letter-spacing:0.08em;flex-shrink:0;">STEP 3</span>
-      <span style="font-size:0.78rem;font-weight:700;color:#1e3a5f;">🚀 分析実行</span>
+      <span style="font-size:0.78rem;font-weight:700;color:#1e3a5f;">分析実行</span>
     </div>
     <div style="font-size:0.65rem;color:#66788a;margin-top:3px;">最適化 → 5段階プロファイル生成</div>
   </div>
@@ -847,7 +847,7 @@ if uploaded_file is not None:
 </div><!-- /settings-panel-body -->
 """, unsafe_allow_html=True)
 
-    run_button = st.button("🚀　分析実行　— ポートフォリオ最適化を開始", type="primary", use_container_width=True)
+    run_button = st.button("分析実行　— ポートフォリオ最適化を開始", type="primary", use_container_width=True)
 
     st.markdown("""
 <div style="font-size:0.65rem;color:rgba(255,255,255,0.3);text-align:center;margin-top:6px;margin-bottom:4px;">
