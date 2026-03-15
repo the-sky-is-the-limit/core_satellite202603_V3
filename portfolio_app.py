@@ -757,7 +757,7 @@ if uploaded_file is not None:
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.markdown(f'<div {_lbl}><span>📅</span> 分析期間</div>', unsafe_allow_html=True)
+        st.markdown(f'<div {_lbl}><span>■</span> 分析期間</div>', unsafe_allow_html=True)
         period_options = {"1年": 12, "3年": 36, "5年": 60, "10年": 120, "15年": 180}
         selected_period = st.selectbox(
             "分析期間", list(period_options.keys()), index=1, label_visibility="collapsed"
@@ -775,7 +775,7 @@ if uploaded_file is not None:
         st.stop()
     
     with col2:
-        st.markdown(f'<div {_lbl}><span>📊</span> 比較ベンチマーク</div>', unsafe_allow_html=True)
+        st.markdown(f'<div {_lbl}><span>■</span> 比較ベンチマーク</div>', unsafe_allow_html=True)
         benchmark_options = ["なし"] + fund_cols
         default_benchmark = "世界株" if "世界株" in fund_cols else "なし"
         default_index = benchmark_options.index(default_benchmark)
@@ -785,7 +785,7 @@ if uploaded_file is not None:
     
     with col3:
         st.markdown(
-            f'<div {_lbl}><span>🎯</span> コアファンドを選択'
+            f'<div {_lbl}><span>■</span> コアファンドを選択'
             f'<span style="margin-left:auto;font-size:0.68rem;font-weight:600;'
             f'color:rgba(179,144,74,0.85);white-space:nowrap;">{len(valid_funds_temp)}本</span></div>',
             unsafe_allow_html=True
