@@ -1,8 +1,14 @@
 """
-portfolio_report.py  v1.1.0
+portfolio_report.py  v1.2.0
 =============================
 統合レポートパネル・エクスポート機能モジュール。
 portfolio_app.py から import して使用する。
+
+修正（v1.2.0 — 2026-03）:
+  compute_rp_portfolio をモジュールレベルに昇格（importable化）。
+  build_report_data に show_rp / rp_result / tr_portfolio 引数を追加。
+  render_report_panel にテールリスク最小型カードを追加。
+  build_report_data の return バグを修正（show_diagnosis=True 時も正しく返す）。
 
 修正（v1.1.0 — 2026-03）:
   _rank_asc/_rank_desc/_profile_commentary を for ループ外に正しく配置。
@@ -21,19 +27,70 @@ from portfolio_utils import PortfolioAnalyzer
 
 # ── デザインシステム定数 ───────────────────────────────────────
 _PROFILE_META = {
-    "積極型":     {"color": "#9b2c2c", "grad": "linear-gradient(135deg,#9b2c2c,#7b1f1f)", "label_en": "Aggressive",   "icon": "▲▲"},
-    "やや積極型": {"color": "#c05621", "grad": "linear-gradient(135deg,#c05621,#9a4218)", "label_en": "Growth",       "icon": "▲"},
-    "バランス型": {"color": "#2f855a", "grad": "linear-gradient(135deg,#2f855a,#236644)", "label_en": "Balanced",     "icon": "◆"},
-    "やや保守型": {"color": "#2b6cb0", "grad": "linear-gradient(135deg,#2b6cb0,#1e4f8a)", "label_en": "Moderate",     "icon": "▼"},
-    "保守型":     {"color": "#2c5282", "grad": "linear-gradient(135deg,#2c5282,#1e3a63)", "label_en": "Conservative", "icon": "▼▼"},
+    "積極型":         {"color": "#9b2c2c", "grad": "linear-gradient(135deg,#9b2c2c,#7b1f1f)", "label_en": "Aggressive",   "icon": "▲▲"},
+    "やや積極型":     {"color": "#c05621", "grad": "linear-gradient(135deg,#c05621,#9a4218)", "label_en": "Growth",       "icon": "▲"},
+    "バランス型":     {"color": "#2f855a", "grad": "linear-gradient(135deg,#2f855a,#236644)", "label_en": "Balanced",     "icon": "◆"},
+    "やや保守型":     {"color": "#2b6cb0", "grad": "linear-gradient(135deg,#2b6cb0,#1e4f8a)", "label_en": "Moderate",     "icon": "▼"},
+    "保守型":         {"color": "#2c5282", "grad": "linear-gradient(135deg,#2c5282,#1e3a63)", "label_en": "Conservative", "icon": "▼▼"},
+    "リスクパリティ": {"color": "#6366f1", "grad": "linear-gradient(135deg,#4338ca,#6366f1)", "label_en": "Risk Parity",  "icon": "⚖"},
+    "テールリスク最小型": {"color": "#553c9a", "grad": "linear-gradient(135deg,#44337a,#6b46c1)", "label_en": "Tail-Risk Min", "icon": "🛡"},
 }
+
+# ── 標準5プロファイル定数（比較テーブル・カード等で使用） ─────
+_STANDARD_PROFILES = ["積極型", "やや積極型", "バランス型", "やや保守型", "保守型"]
+
+
+@st.cache_data(show_spinner=False)
+def compute_rp_portfolio(_rets, _funds_tuple, _core_name, _lw: bool, _rf: float, data_hash: str = ""):
+    """リスクパリティポートフォリオを計算してキャッシュする。
+
+    コアウェイト制約（バランス型と同一：50〜65%）を維持したまま、
+    サテライト各ファンドのリスク寄与（Risk Contribution）を均等化した配分を算出。
+
+    Returns
+    -------
+    tuple[np.ndarray, dict, float]
+        (weights, stats, risk_contribution_cv)
+        risk_contribution_cv: サテライトのリスク寄与 CV（変動係数）。0%に近いほど均等化が達成されている。
+    """
+    _az  = PortfolioAnalyzer(_rets, risk_free_rate=_rf, use_ledoit_wolf=_lw)
+    _ci  = list(_funds_tuple).index(_core_name)
+    _w   = _az.optimize_portfolio(
+        _ci,
+        core_weight_range=(0.50, 0.65),   # バランス型と同一のコア範囲
+        objective_type="risk_parity",
+        max_individual=0.20,
+        min_individual=0.03,
+    )
+    _st  = _az.calculate_portfolio_stats(_w)
+    _cov = _az.cov_matrix.values
+    _vol = np.sqrt(_w @ _cov @ _w)
+    _mrc = _cov @ _w
+    _rc  = _w * _mrc / _vol if _vol > 1e-8 else np.zeros_like(_w)
+    _non_core = np.array([i != _ci for i in range(len(_w))])
+    _rc_sat   = _rc[_non_core]
+    _rc_cv    = (_rc_sat.std() / _rc_sat.mean() * 100) if _rc_sat.mean() > 1e-8 else 0.0
+    return _w, _st, float(_rc_cv)
 
 def build_report_data(
     portfolios, selected_funds, core_fund, core_idx,
     fund_stats, returns_selected, rf_rate,
     show_diagnosis,
+    show_rp: bool = False,
+    rp_result=None,
+    tr_portfolio=None,
 ) -> dict:
-    """比較・診断・カード描画に必要なデータを事前計算して dict で返す。"""
+    """比較・診断・カード描画に必要なデータを事前計算して dict で返す。
+
+    Parameters
+    ----------
+    show_rp : bool
+        True のとき、comparison_df にリスクパリティとテールリスク最小型の行を追加する。
+    rp_result : tuple | None
+        compute_rp_portfolio() の戻り値 (weights, stats, rc_cv)。
+    tr_portfolio : dict | None
+        portfolios["テールリスク最小型"] の値（weights / stats / config）。
+    """
     # ─── comparison_df：最適化直後にタブスコープ外で定義 ──────────
     # U-04 修正：_rpt_tab1 内で定義すると、タブが描画されなかった場合に
     # Excelエクスポート処理で NameError が発生するため、ここで事前計算する。
@@ -42,21 +99,38 @@ def build_report_data(
     # 参照側（st.dataframe の column_config や Excel 出力）に委ねる。
     # 旧実装は "12.34%" 形式の文字列を生成し、Excel 出力時に
     # .replace('%','') で逆変換していたため、書式変更で無言に壊れるリスクがあった。
+
+    def _pf_row(name, cps, cpw):
+        return {
+            "プロファイル":  name,
+            "年率リターン":  round(cps["年率リターン"]      * 100, 2),
+            "年平均リスク":  round(cps["年率ボラティリティ"] * 100, 2),
+            "シャープ":      round(cps["シャープレシオ"],          3),
+            "ソルティノ":    round(cps["ソルティノレシオ"],         3),
+            "最大DD":        round(cps["最大ドローダウン"]   * 100, 2),
+            "カルマー":      round(cps["カルマー比率"],            3),
+            "コア比率":      round(float(cpw[core_idx])     * 100, 1),
+            "ファンド数":    int((cpw > 0.01).sum()),
+        }
+
     _comparison_data = []
-    for _cpname, _cpf in portfolios.items():
-        _cps = _cpf["stats"]
-        _cpw = _cpf["weights"]
-        _comparison_data.append({
-            "プロファイル":  _cpname,
-            "年率リターン":  round(_cps["年率リターン"]      * 100, 2),   # float %
-            "年平均リスク":  round(_cps["年率ボラティリティ"] * 100, 2),   # float %
-            "シャープ":      round(_cps["シャープレシオ"],          3),    # float
-            "ソルティノ":    round(_cps["ソルティノレシオ"],         3),    # float
-            "最大DD":        round(_cps["最大ドローダウン"]   * 100, 2),   # float % (負値)
-            "カルマー":      round(_cps["カルマー比率"],            3),    # float
-            "コア比率":      round(float(_cpw[core_idx])     * 100, 1),   # float %
-            "ファンド数":    int((_cpw > 0.01).sum()),                     # int
-        })
+    # 標準5プロファイルのみを基本行として追加（テールリスク最小型は別扱い）
+    for _cpname in _STANDARD_PROFILES:
+        if _cpname not in portfolios:
+            continue
+        _cpf = portfolios[_cpname]
+        _comparison_data.append(_pf_row(_cpname, _cpf["stats"], _cpf["weights"]))
+
+    # ── チェックボックスON時：リスクパリティ・テールリスク最小型を追加 ──
+    if show_rp:
+        if rp_result is not None:
+            _rp_w, _rp_st, _ = rp_result
+            _comparison_data.append(_pf_row("リスクパリティ", _rp_st, _rp_w))
+        if tr_portfolio is not None:
+            _tr_w = tr_portfolio["weights"]
+            _tr_st = tr_portfolio["stats"]
+            _comparison_data.append(_pf_row("テールリスク最小型", _tr_st, _tr_w))
+
     comparison_df = pd.DataFrame(_comparison_data)
 
     # ── 表示用フォーマット辞書（st.dataframe の column_config で使用）──────
@@ -182,15 +256,17 @@ def build_report_data(
         core_volatility = core_stats_fs['年率ボラ']
         core_return     = core_stats_fs['年率リターン']
 
-        # ── 計算済みデータを dict で返す ─────────────────────────────
-        return {
-            "comparison_df":       comparison_df,
-            "_comparison_col_cfg": _comparison_col_cfg,
-            "core_stats_fs":       core_stats_fs,
-            "core_sharpe":         core_sharpe,
-            "core_volatility":     core_volatility,
-            "core_return":         core_return,
-        }
+    # ── 計算済みデータを dict で返す（show_diagnosis の if/else を抜けた後に必ず実行）──
+    # v1.2.0 バグ修正: 旧実装では else ブロック内にのみ return があったため、
+    # show_diagnosis=True の場合に None が返されていた。
+    return {
+        "comparison_df":       comparison_df,
+        "_comparison_col_cfg": _comparison_col_cfg,
+        "core_stats_fs":       core_stats_fs,
+        "core_sharpe":         core_sharpe,
+        "core_volatility":     core_volatility,
+        "core_return":         core_return,
+    }
 
 
 def render_report_panel(
@@ -200,11 +276,15 @@ def render_report_panel(
     show_rp: bool = False,
     overview_raw=None,
     use_lw: bool = False,
+    rp_result=None,
+    tr_portfolio=None,
 ):
     """統合レポートパネル（プロファイルカード＋3タブ）を描画する。"""
     # portfolio_app.py のサイドバー値をローカル変数にバインド
-    _show_rp    = show_rp
-    _use_lw     = use_lw
+    _show_rp      = show_rp
+    _use_lw       = use_lw
+    _rp_result    = rp_result
+    _tr_portfolio = tr_portfolio
     if overview_raw is None:
         overview_raw = pd.DataFrame()
 
@@ -466,119 +546,168 @@ def render_report_panel(
             unsafe_allow_html=True
         )
 
-        # ── [改善F] リスクパリティ カード（サイドバーチェック時のみ表示） ──
+        # ── [改善F] リスクパリティ & テールリスク最小型 カード（サイドバーチェック時のみ） ──
         if _show_rp:
-            @st.cache_data(show_spinner=False)
-            def _compute_risk_parity(_rets, _funds_tuple, _core_name, _lw: bool, data_hash: str = ""):
-                """リスクパリティ最適化（バランス型設定で実行）"""
-                _az  = PortfolioAnalyzer(_rets, use_ledoit_wolf=_lw)
-                _ci  = list(_funds_tuple).index(_core_name)
-                _w   = _az.optimize_portfolio(
-                    _ci,
-                    core_weight_range=(0.50, 0.65),  # バランス型と同一コア範囲
-                    objective_type='risk_parity',
-                    max_individual=0.20,
-                    min_individual=0.03,
-                )
-                _st  = _az.calculate_portfolio_stats(_w)
-                # サテライトのリスク寄与均等度を算出（情報表示用）
-                _cov = _az.cov_matrix.values
-                _vol = np.sqrt(_w @ _cov @ _w)
-                _mrc = _cov @ _w
-                _rc  = _w * _mrc / _vol if _vol > 1e-8 else np.zeros_like(_w)
-                _non_core = np.array([i != _ci for i in range(len(_w))])
-                _rc_sat   = _rc[_non_core]
-                _rc_cv    = (_rc_sat.std() / _rc_sat.mean() * 100) if _rc_sat.mean() > 1e-8 else 0.0
-                return _w, _st, float(_rc_cv)
+            # ヘッダーバー
+            st.markdown(
+                '<div style="margin-top:16px;padding:6px 0 4px 0;'
+                'border-top:1px solid rgba(99,102,241,0.25);">'
+                '<span style="font-size:0.68rem;font-weight:800;letter-spacing:0.1em;'
+                'text-transform:uppercase;color:#6366f1;">⚖️ リスクパリティ配分（参考）</span>'
+                '<span style="font-size:0.65rem;color:#64748b;margin-left:8px;">'
+                'サテライトのリスク寄与を均等化した配分 / テールリスク最小型（CVaR最小化）</span>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
 
-            try:
-                _ret_hash = hashlib.sha256(
-                    pd.util.hash_pandas_object(returns_selected, index=True).values.tobytes()
-                ).hexdigest()[:16]
-                _rp_w, _rp_st, _rp_rc_cv = _compute_risk_parity(
-                    returns_selected,
-                    tuple(selected_funds),
-                    core_fund,
-                    _use_lw,
-                    _ret_hash,
-                )
-                _rp_ret  = _rp_st['年率リターン'] * 100
-                _rp_vol  = _rp_st['年率ボラティリティ'] * 100
-                _rp_sr   = _rp_st['シャープレシオ']
-                _rp_dd   = _rp_st['最大ドローダウン'] * 100
-                _rp_core = _rp_w[core_idx] * 100
-                _rp_nf   = int((_rp_w > 0.01).sum())
-                _rp_ret_sign = "+" if _rp_ret >= 0 else ""
-                _rp_sr_color = "#1e8449" if _rp_sr >= 1.0 else ("#d35400" if _rp_sr >= 0.5 else "#c0392b")
-                _rp_donut    = _donut_svg(_rp_core, "rgba(255,255,255,0.9)")
+            # ── リスクパリティ カード ─────────────────────────────
+            if rp_result is not None:
+                try:
+                    _rp_w, _rp_st, _rp_rc_cv = rp_result
+                    _rp_ret  = _rp_st['年率リターン'] * 100
+                    _rp_vol  = _rp_st['年率ボラティリティ'] * 100
+                    _rp_sr   = _rp_st['シャープレシオ']
+                    _rp_dd   = _rp_st['最大ドローダウン'] * 100
+                    _rp_core = _rp_w[core_idx] * 100
+                    _rp_nf   = int((_rp_w > 0.01).sum())
+                    _rp_ret_sign = "+" if _rp_ret >= 0 else ""
+                    _rp_sr_color = "#1e8449" if _rp_sr >= 1.0 else ("#d35400" if _rp_sr >= 0.5 else "#c0392b")
+                    _rp_donut    = _donut_svg(_rp_core, "rgba(255,255,255,0.9)")
+
+                    _rp_card_html = (
+                        f'<div class="profile-card" style="border-color:#6366f140;max-width:260px;">'
+                        f'  <div class="profile-card-header" style="background:linear-gradient(135deg,#4338ca,#6366f1);">'
+                        f'    <div class="profile-card-eyebrow">RISK PARITY</div>'
+                        f'    <div class="profile-card-title">リスクパリティ</div>'
+                        f'    <div class="profile-card-range">コア比率 50–65%（バランス型と同一）</div>'
+                        f'    <div class="profile-card-top">'
+                        f'      {_rp_donut}'
+                        f'      <div style="text-align:right;">'
+                        f'        <div class="profile-card-ret">{_rp_ret_sign}{_rp_ret:.1f}%</div>'
+                        f'        <div class="profile-card-ret-label">年率リターン（実績）</div>'
+                        f'      </div>'
+                        f'    </div>'
+                        f'  </div>'
+                        f'  <div class="profile-card-body">'
+                        f'    <div class="profile-card-row">'
+                        f'      <span class="profile-card-row-label">年平均リスク'
+                        f'        <span class="profile-card-row-label-sub">年間の価格変動幅の目安</span>'
+                        f'      </span>'
+                        f'      <span class="profile-card-row-val">{_rp_vol:.1f}%</span>'
+                        f'    </div>'
+                        f'    <div class="profile-card-row">'
+                        f'      <span class="profile-card-row-label">シャープレシオ'
+                        f'        <span class="profile-card-row-label-sub">リターン効率（1.0超が目安）</span>'
+                        f'      </span>'
+                        f'      <span class="profile-card-row-val" style="color:{_rp_sr_color};">{_rp_sr:.2f}</span>'
+                        f'    </div>'
+                        f'    <div class="profile-card-row">'
+                        f'      <span class="profile-card-row-label">最大DD（実績）'
+                        f'        <span class="profile-card-row-label-sub">分析期間中の最大下落率</span>'
+                        f'      </span>'
+                        f'      <span class="profile-card-row-val" style="color:#c0392b;">{_rp_dd:.1f}%</span>'
+                        f'    </div>'
+                        f'    <div class="profile-card-row">'
+                        f'      <span class="profile-card-row-label">リスク寄与CV（均等度）'
+                        f'        <span class="profile-card-row-label-sub">低いほど均等（目標：0%）</span>'
+                        f'      </span>'
+                        f'      <span class="profile-card-row-val" style="color:#6366f1;">{_rp_rc_cv:.1f}%</span>'
+                        f'    </div>'
+                        f'    <div class="profile-card-row">'
+                        f'      <span class="profile-card-row-label">組入ファンド数'
+                        f'        <span class="profile-card-row-label-sub">分散の状況</span>'
+                        f'      </span>'
+                        f'      <span class="profile-card-row-val">{_rp_nf}本</span>'
+                        f'    </div>'
+                        f'  </div>'
+                        f'</div>'
+                    )
+                except Exception as _rp_err:
+                    _rp_card_html = f'<div style="color:#c0392b;font-size:0.8rem;">⚠️ リスクパリティ最適化失敗: {_rp_err}</div>'
+            else:
+                _rp_card_html = ""
+
+            # ── テールリスク最小型 カード ─────────────────────────
+            _tr_card_html = ""
+            if tr_portfolio is not None:
+                try:
+                    _tr_w  = tr_portfolio["weights"]
+                    _tr_st = tr_portfolio["stats"]
+                    _tr_ret  = _tr_st['年率リターン'] * 100
+                    _tr_vol  = _tr_st['年率ボラティリティ'] * 100
+                    _tr_sr   = _tr_st['シャープレシオ']
+                    _tr_dd   = _tr_st['最大ドローダウン'] * 100
+                    _tr_core = _tr_w[core_idx] * 100
+                    _tr_nf   = int((_tr_w > 0.01).sum())
+                    _tr_ret_sign = "+" if _tr_ret >= 0 else ""
+                    _tr_sr_color = "#1e8449" if _tr_sr >= 1.0 else ("#d35400" if _tr_sr >= 0.5 else "#c0392b")
+                    _tr_donut    = _donut_svg(_tr_core, "rgba(255,255,255,0.9)")
+                    # CVaR（月次）を取得 — stats に格納済みの場合はそれを使用
+                    _tr_cvar = _tr_st.get('月次CVaR_95', None)
+                    _tr_cvar_str = f"{_tr_cvar*100:.2f}%" if _tr_cvar is not None else "—"
+
+                    _tr_card_html = (
+                        f'<div class="profile-card" style="border-color:#553c9a40;max-width:260px;">'
+                        f'  <div class="profile-card-header" style="background:linear-gradient(135deg,#44337a,#6b46c1);">'
+                        f'    <div class="profile-card-eyebrow">TAIL-RISK MIN</div>'
+                        f'    <div class="profile-card-title">テールリスク最小型</div>'
+                        f'    <div class="profile-card-range">コア比率 70–85%（CVaR最小化）</div>'
+                        f'    <div class="profile-card-top">'
+                        f'      {_tr_donut}'
+                        f'      <div style="text-align:right;">'
+                        f'        <div class="profile-card-ret">{_tr_ret_sign}{_tr_ret:.1f}%</div>'
+                        f'        <div class="profile-card-ret-label">年率リターン（実績）</div>'
+                        f'      </div>'
+                        f'    </div>'
+                        f'  </div>'
+                        f'  <div class="profile-card-body">'
+                        f'    <div class="profile-card-row">'
+                        f'      <span class="profile-card-row-label">年平均リスク'
+                        f'        <span class="profile-card-row-label-sub">年間の価格変動幅の目安</span>'
+                        f'      </span>'
+                        f'      <span class="profile-card-row-val">{_tr_vol:.1f}%</span>'
+                        f'    </div>'
+                        f'    <div class="profile-card-row">'
+                        f'      <span class="profile-card-row-label">シャープレシオ'
+                        f'        <span class="profile-card-row-label-sub">リターン効率（1.0超が目安）</span>'
+                        f'      </span>'
+                        f'      <span class="profile-card-row-val" style="color:{_tr_sr_color};">{_tr_sr:.2f}</span>'
+                        f'    </div>'
+                        f'    <div class="profile-card-row">'
+                        f'      <span class="profile-card-row-label">最大DD（実績）'
+                        f'        <span class="profile-card-row-label-sub">分析期間中の最大下落率</span>'
+                        f'      </span>'
+                        f'      <span class="profile-card-row-val" style="color:#c0392b;">{_tr_dd:.1f}%</span>'
+                        f'    </div>'
+                        f'    <div class="profile-card-row">'
+                        f'      <span class="profile-card-row-label">月次CVaR 95%'
+                        f'        <span class="profile-card-row-label-sub">ワースト5%月の平均損失</span>'
+                        f'      </span>'
+                        f'      <span class="profile-card-row-val" style="color:#553c9a;">{_tr_cvar_str}</span>'
+                        f'    </div>'
+                        f'    <div class="profile-card-row">'
+                        f'      <span class="profile-card-row-label">組入ファンド数'
+                        f'        <span class="profile-card-row-label-sub">分散の状況</span>'
+                        f'      </span>'
+                        f'      <span class="profile-card-row-val">{_tr_nf}本</span>'
+                        f'    </div>'
+                        f'  </div>'
+                        f'</div>'
+                    )
+                except Exception as _tr_err:
+                    _tr_card_html = f'<div style="color:#c0392b;font-size:0.8rem;">⚠️ テールリスク最小型表示失敗: {_tr_err}</div>'
+
+            # ── 2カードを横並び表示 ────────────────────────────────
+            if _rp_card_html or _tr_card_html:
                 st.markdown(
-                    '<div style="margin-top:16px;padding:6px 0 4px 0;'
-                    'border-top:1px solid rgba(99,102,241,0.25);">'
-                    '<span style="font-size:0.68rem;font-weight:800;letter-spacing:0.1em;'
-                    'text-transform:uppercase;color:#6366f1;">⚖️ リスクパリティ配分（参考）</span>'
-                    '<span style="font-size:0.65rem;color:#64748b;margin-left:8px;">'
-                    'サテライトのリスク寄与を均等化した配分</span>'
-                    '</div>',
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    f'<div class="profile-cards-wrap">'
-                    f'<div class="profile-card" style="border-color:#6366f140;max-width:260px;">'
-                    f'  <div class="profile-card-header" style="background:linear-gradient(135deg,#4338ca,#6366f1);">'
-                    f'    <div class="profile-card-eyebrow">RISK PARITY</div>'
-                    f'    <div class="profile-card-title">リスクパリティ</div>'
-                    f'    <div class="profile-card-range">コア比率 50–65%（バランス型と同一）</div>'
-                    f'    <div class="profile-card-top">'
-                    f'      {_rp_donut}'
-                    f'      <div style="text-align:right;">'
-                    f'        <div class="profile-card-ret">{_rp_ret_sign}{_rp_ret:.1f}%</div>'
-                    f'        <div class="profile-card-ret-label">年率リターン（実績）</div>'
-                    f'      </div>'
-                    f'    </div>'
-                    f'  </div>'
-                    f'  <div class="profile-card-body">'
-                    f'    <div class="profile-card-row">'
-                    f'      <span class="profile-card-row-label">年平均リスク'
-                    f'        <span class="profile-card-row-label-sub">年間の価格変動幅の目安</span>'
-                    f'      </span>'
-                    f'      <span class="profile-card-row-val">{_rp_vol:.1f}%</span>'
-                    f'    </div>'
-                    f'    <div class="profile-card-row">'
-                    f'      <span class="profile-card-row-label">シャープレシオ'
-                    f'        <span class="profile-card-row-label-sub">リターン効率（1.0超が目安）</span>'
-                    f'      </span>'
-                    f'      <span class="profile-card-row-val" style="color:{_rp_sr_color};">{_rp_sr:.2f}</span>'
-                    f'    </div>'
-                    f'    <div class="profile-card-row">'
-                    f'      <span class="profile-card-row-label">最大DD（実績）'
-                    f'        <span class="profile-card-row-label-sub">分析期間中の最大下落率</span>'
-                    f'      </span>'
-                    f'      <span class="profile-card-row-val" style="color:#c0392b;">{_rp_dd:.1f}%</span>'
-                    f'    </div>'
-                    f'    <div class="profile-card-row">'
-                    f'      <span class="profile-card-row-label">リスク寄与CV（均等度）'
-                    f'        <span class="profile-card-row-label-sub">低いほど均等（目標：0%）</span>'
-                    f'      </span>'
-                    f'      <span class="profile-card-row-val" style="color:#6366f1;">{_rp_rc_cv:.1f}%</span>'
-                    f'    </div>'
-                    f'    <div class="profile-card-row">'
-                    f'      <span class="profile-card-row-label">組入ファンド数'
-                    f'        <span class="profile-card-row-label-sub">分散の状況</span>'
-                    f'      </span>'
-                    f'      <span class="profile-card-row-val">{_rp_nf}本</span>'
-                    f'    </div>'
-                    f'  </div>'
-                    f'</div>'
-                    f'</div>',
+                    f'<div class="profile-cards-wrap">{_rp_card_html}{_tr_card_html}</div>',
                     unsafe_allow_html=True,
                 )
                 st.caption(
-                    "⚖️ **リスクパリティ配分**：各サテライトファンドのリスク寄与（Risk Contribution）が"
-                    "均等になるよう配分を決定します。「リスク寄与CV」が0%に近いほど均等化が実現されています。"
-                    "コア比率はバランス型（50〜65%）と同一設定。バランス型との比較にご活用ください。"
+                    "⚖️ **リスクパリティ**：各サテライトのリスク寄与（RC）が均等になるよう配分。「リスク寄与CV」が0%に近いほど均等。"
+                    "　🛡️ **テールリスク最小型**：CVaR（ワースト5%月の平均損失）を直接最小化。正規分布を前提としないためヘッジファンド特有の"
+                    "ファットテール・左歪み分布に対応。超保守クライアント向けの参考値としてご活用ください。"
                 )
-            except Exception as _rp_err:
-                st.warning(f"⚠️ リスクパリティ最適化に失敗しました: {_rp_err}")
 
         # ─── 詳細メトリクスバッジ（全5プロファイル・サイドバーチェックで制御）──
         if st.session_state.get('show_profile_metrics', False):
@@ -629,8 +758,9 @@ def render_report_panel(
         # 「比較サマリー」タブの内容を完結させる。
         if not comparison_df.empty:
             st.markdown('<hr style="border:none;border-top:1px solid #e2e8f0;margin:18px 0 12px 0;">', unsafe_allow_html=True)
+            _cmp_title = "5プロファイル + 参考配分 数値比較" if _show_rp else "5プロファイル 数値比較"
             st.markdown(
-                '<div class="tab-sub-header">5プロファイル 数値比較</div>',
+                f'<div class="tab-sub-header">{_cmp_title}</div>',
                 unsafe_allow_html=True,
             )
             st.dataframe(
@@ -639,10 +769,10 @@ def render_report_panel(
                 use_container_width=True,
                 hide_index=True,
             )
-            st.caption(
-                "💡 年率リターン・最大DD はCAGRベース。シャープ・ソルティノ・カルマーは高いほど優秀。"
-                "　コア比率はポートフォリオ内のコアファンド比率。"
-            )
+            _cmp_caption = "💡 年率リターン・最大DD はCAGRベース。シャープ・ソルティノ・カルマーは高いほど優秀。　コア比率はポートフォリオ内のコアファンド比率。"
+            if _show_rp:
+                _cmp_caption += "　⚖️リスクパリティ・🛡テールリスク最小型はサイドバーチェックON時に追加表示される参考プロファイルです。"
+            st.caption(_cmp_caption)
 
     with _rpt_tab2:
         st.markdown(
@@ -655,13 +785,18 @@ def render_report_panel(
         )
         st.markdown('<div class="tab-sub-header">プロファイル別 ファンド構成</div>', unsafe_allow_html=True)
 
+        # ファンド構成テーブルは標準5プロファイルのみを対象とする
+        # テールリスク最小型 / リスクパリティは portfolios dict に入っているが
+        # 構成表の列には含めない（allocation_df の列が増えすぎるのを防ぐ）
+        _tab2_profiles = [p for p in _STANDARD_PROFILES if p in portfolios]
+
         # 各プロファイルの投資比率を列として構築（転置形式）
         allocation_data = {}
 
         # 全ファンドでウェイトが1%以上あるものを収集
         funds_with_weights = set()
-        for profile_name, portfolio in portfolios.items():
-            w = portfolio["weights"]
+        for profile_name in _tab2_profiles:
+            w = portfolios[profile_name]["weights"]
             for i, fund in enumerate(selected_funds):
                 if w[i] >= 0.01:
                     funds_with_weights.add(fund)
@@ -670,8 +805,8 @@ def render_report_panel(
         for fund in selected_funds:
             if fund in funds_with_weights:
                 allocation_data[fund] = {}
-                for profile_name, portfolio in portfolios.items():
-                    w = portfolio["weights"]
+                for profile_name in _tab2_profiles:
+                    w = portfolios[profile_name]["weights"]
                     fund_idx = selected_funds.index(fund)
                     if w[fund_idx] >= 0.01:
                         allocation_data[fund][profile_name] = f"{w[fund_idx]*100:.1f}%"
@@ -686,21 +821,21 @@ def render_report_panel(
         for fund in selected_funds:
             if fund in funds_with_weights:
                 allocation_data_numeric[fund] = {}
-                for profile_name, portfolio in portfolios.items():
-                    w = portfolio["weights"]
+                for profile_name in _tab2_profiles:
+                    w = portfolios[profile_name]["weights"]
                     fund_idx = selected_funds.index(fund)
                     allocation_data_numeric[fund][profile_name] = (
                         round(w[fund_idx] * 100, 1) if w[fund_idx] >= 0.01 else 0.0
                     )
         allocation_df_numeric = pd.DataFrame.from_dict(allocation_data_numeric, orient='index')
-        allocation_df_numeric = allocation_df_numeric[profile_order_list]
+        allocation_df_numeric = allocation_df_numeric[_tab2_profiles]
         allocation_df_numeric.index.name = "ファンド"
         if core_fund in allocation_df_numeric.index:
             _other = [f for f in allocation_df_numeric.index if f != core_fund]
             allocation_df_numeric = allocation_df_numeric.loc[[core_fund] + _other]
 
-        # プロファイルの順序を指定（profile_order_list と統一）
-        allocation_df = allocation_df[profile_order_list]
+        # プロファイルの順序を指定（_tab2_profiles と統一）
+        allocation_df = allocation_df[_tab2_profiles]
 
         # インデックス名を設定
         allocation_df.index.name = "ファンド"
