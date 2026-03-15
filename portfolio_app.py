@@ -1417,6 +1417,7 @@ if uploaded_file is not None:
         fund_stats=fund_stats,
         returns_selected=returns_selected,
         rf_rate=rf_rate,
+        show_rp=_show_rp,
     )
 
     # 詳細分析セクション（外側：プロファイルタブ）
