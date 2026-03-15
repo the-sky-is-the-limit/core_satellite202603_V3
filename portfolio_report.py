@@ -22,7 +22,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
-from portfolio_charts import _donut_svg, _badge
+from portfolio_charts import donut_svg as _donut_svg, badge as _badge  # [ISSUE-3修正] 公開 API から import
 from portfolio_utils import PortfolioAnalyzer
 
 # ── デザインシステム定数 ───────────────────────────────────────
