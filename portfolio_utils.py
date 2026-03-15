@@ -755,6 +755,7 @@ class PortfolioAnalyzer:
             'volatility'   : ボラティリティ最小化
             'risk_adjusted': リスク調整後リターン（μ - 1.0σ）やや保守型向け
             'risk_parity'  : リスクパリティ（サテライトリスク寄与均等化）
+            'min_cvar'     : CVaR最小化（ワースト5%月次リターン平均）保守型向け
         max_individual : float
         min_individual : float
         target_volatility : float
