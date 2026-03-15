@@ -1404,12 +1404,11 @@ if uploaded_file is not None:
         rf_rate=rf_rate,
         show_diagnosis=st.session_state.get("show_diagnosis", False),
     )
-    # comparison_df / allocation_df_numeric を ctx から取り出して
-    # プロファイルタブ・エクスポートでも参照できるようにする
-    comparison_df        = _report_ctx["comparison_df"]
-    allocation_df_numeric = _report_ctx.get("allocation_df_numeric")
+    # comparison_df / _comparison_col_cfg を ctx から取り出す
+    comparison_df         = _report_ctx["comparison_df"]
 
-    render_report_panel(
+    # render_report_panel は allocation_df_numeric を返す
+    allocation_df_numeric = render_report_panel(
         ctx=_report_ctx,
         portfolios=portfolios,
         selected_funds=selected_funds,
