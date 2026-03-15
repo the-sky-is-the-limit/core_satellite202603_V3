@@ -1584,7 +1584,7 @@ if uploaded_file is not None:
                     period_start=_period_start,
                     period_end=_period_end,
                     period_months=_period_months,
-                    analyzer=analyzer,
+                    rf_rate=rf_rate,
                 )
             except Exception as _e:
                 st.error(f"ポートフォリオデータの取得に失敗: {_e}")
@@ -1647,7 +1647,7 @@ if uploaded_file is not None:
                     period_start=_period_start,
                     period_end=_period_end,
                     period_months=_period_months,
-                    analyzer=analyzer,
+                    rf_rate=rf_rate,
                 )
             except Exception as _e:
                 st.error(f"{_ep_name}の詳細分析に失敗: {_e}")
