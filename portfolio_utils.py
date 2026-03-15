@@ -1,5 +1,34 @@
 """
-ポートフォリオ最適化 - ユーティリティ関数（改善版 v3.4.0）
+ポートフォリオ最適化 - ユーティリティ関数（改善版 v3.4.1）
+
+改善内容（v3.4.1 — コードレビュー修正 2026-03）:
+✅ [BUG-1] FundScreener にクラスレベル統計キャッシュを実装
+   - 旧実装は _stats_cache_hit を常に False に設定するだけでキャッシュ機構が存在せず、
+     test_app.py テスト4 [A3] が必ず AssertionError になっていた。
+   - FundScreener._statistics_cache（クラス変数 Dict）を追加し、
+     _make_stats_cache_key() が返す MD5 ベースキーでヒット/ミスを制御する。
+   - キャッシュ本体は .copy() で保護し screen_funds() による列追加汚染を防止。
+
+✅ [ISSUE-1] calculate_fund_metrics() の戻り値型を全ケースで str に統一
+   - データ不足時（12本未満）が np.nan（float）を返していたため、
+     呼び出し元の文字列連結で "nan" が表示されるリスクがあった。
+   - データ不足時も "—" 文字列を返すよう修正。
+
+✅ [ISSUE-2] optimize_portfolio() 内に下限可行性チェックを追加
+   - アプリ層の O-04 修正はあるが、ライブラリを直接呼ぶ test_app.py 等では
+     core_min + (n_assets-1) × min_individual > 1.0 の場合に
+     min_individual 制約が適用されないまま w1 が返されていた。
+   - optimize_portfolio() 入口で同様の可行性チェックを行い、
+     必要に応じて min_individual を自動調整する（RuntimeWarning を発行）。
+
+✅ [MINOR-1] フォールバックウェイト（全スタート失敗時）に _project_to_feasible_simplex を適用
+   - 旧フォールバックは max_individual クリップのみで min_individual 下限が未適用。
+   - _project_to_feasible_simplex を通すことで min/max/sum=1 の三制約を保証。
+
+✅ [MINOR-2] calculate_efficient_frontier の冗長な二重 np.where を整理
+   - `np.where(valid, np.where(valid, base_all, 1.0) ** exp - 1, np.nan)` を
+     `safe_base = np.where(valid, base_all, 1.0); np.where(valid, safe_base**exp - 1, np.nan)`
+     に分離し、valid の二重評価を解消。
 
 改善内容（v3.4.0 — ステージ1リファクタ 2026-03）:
 ✅ [S1-02] calculate_fund_metrics() をモジュールレベルで新規追加
@@ -143,6 +172,7 @@ v2.0.3の技術的改善:
 2. フォールバック安全性：一次最適化失敗時もコア比率制約を100%保証
 3. 余剰再配分ロジック：max_individual 超過分を収束ループで確実に解消
 """
+import hashlib
 import pandas as pd
 import numpy as np
 from scipy.optimize import minimize
@@ -554,12 +584,17 @@ class PortfolioAnalyzer:
         cum_all = (1.0 + port_returns_all).prod(axis=0) - 1.0   # (K,)
 
         # 1+cum ≤ 0（完全損失）は NaN に
-        base_all = 1.0 + cum_all
-        valid    = base_all > 0.0
-        cagr_arr = np.where(
+        # [MINOR-2修正] 旧実装の二重 np.where を整理。
+        # 内側 np.where(valid, base_all, 1.0) は 0 乗算回避のための safe_base だが、
+        # 外側 np.where(valid, ..., np.nan) と重複して valid を二度評価していた。
+        # safe_base を先に確定してから一回の np.where で CAGR / NaN を切り替える。
+        base_all  = 1.0 + cum_all
+        valid     = base_all > 0.0
+        safe_base = np.where(valid, base_all, 1.0)   # invalid セルは 1.0 でべき乗させて NaN 回避
+        cagr_arr  = np.where(
             valid,
-            np.where(valid, base_all, 1.0) ** (self.periods_per_year / n_pf) - 1.0,
-            np.nan
+            safe_base ** (self.periods_per_year / n_pf) - 1.0,
+            np.nan,
         ).astype(float)
 
         return pd.DataFrame({
@@ -765,6 +800,26 @@ class PortfolioAnalyzer:
         cov_vals = self.cov_matrix.values
         mu_vals  = self.mean_returns_arith.values
 
+        # ── [ISSUE-2修正] 下限可行性チェック & min_individual 自動調整 ─────────
+        # core_min + (n_assets-1) × min_individual > 1.0 の場合、SLSQP の第二段階が
+        # 「可行解なし」と判定してスキップされ、min_individual 制約が適用されないまま
+        # 第一段階の生ウェイト（w1）が返される。
+        # portfolio_app.py の O-04 修正はアプリ層でのみ調整するが、ライブラリとして
+        # 直接呼ばれる場合（test_app.py 等）はここで自己完結的に対処する。
+        _core_lo_v, _core_hi_v = core_weight_range
+        _feasibility_lower = _core_lo_v + (n_assets - 1) * min_individual
+        if _feasibility_lower > 1.0 + 1e-6:
+            _safe_min = max(0.0, (1.0 - _core_lo_v) / max(n_assets - 1, 1) - 1e-6)
+            warnings.warn(
+                f"optimize_portfolio: 下限可行性違反 "
+                f"(core_min={_core_lo_v:.3f} + {n_assets-1} × "
+                f"min_individual={min_individual:.4f} = {_feasibility_lower:.4f} > 1.0)。"
+                f"min_individual を {_safe_min:.4f} に自動調整します。",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            min_individual = _safe_min
+
         def portfolio_stats(w):
             ret = np.dot(w, mu_vals)
             vol = np.sqrt(np.dot(w, np.dot(cov_vals, w)))
@@ -950,7 +1005,15 @@ class PortfolioAnalyzer:
                             diff -= add
                             if abs(diff) < 1e-9:
                                 break
-            return fallback
+            # [MINOR-1修正] フォールバックにも min_individual を適用する。
+            # max_individual クリップループは上限のみを保証するが、
+            # 下限（min_individual）は明示的に適用していなかった。
+            # _project_to_feasible_simplex に通すことで
+            # min/max/sum=1 の三制約を同時に保証する。
+            return self._project_to_feasible_simplex(
+                fallback, _all_active, core_fund_idx,
+                core_weight_range, min_individual, max_individual,
+            )
 
         w1 = best_result.x
 
@@ -1022,7 +1085,19 @@ class PortfolioAnalyzer:
 
 class FundScreener:
     """ファンドスクリーニングクラス"""
-    
+
+    # ── クラスレベル統計キャッシュ（BUG-1修正）────────────────────────────────
+    # 同一データ・同一パラメータでの重複計算を回避する。
+    # キー : _make_stats_cache_key() で生成した MD5 ベースの文字列。
+    # 値   : _calculate_statistics() の結果 DataFrame（深いコピーで保護）。
+    #
+    # 設計上の注意:
+    #   - screen_funds() は statistics に列を追加するが、キャッシュ本体は
+    #     .copy() で保護しているため 3 回目以降のインスタンスに汚染しない。
+    #   - テスト環境ではプロセスをまたいで再利用されないため LRU 制限は不要。
+    #     長時間プロセスで使う場合は maxsize 管理を将来検討する。
+    _statistics_cache: Dict[str, "pd.DataFrame"] = {}
+
     # キャッシュファンド検出用の最低ボラティリティ閾値（年率）
     # 3%を選択した理由:
     #   - キャッシュファンド: 通常0.1-0.5%
@@ -1030,7 +1105,7 @@ class FundScreener:
     #   - 3%で両方を確実に除外可能
     #   - 5%だと一部の債券ファンドも除外される可能性があるため保守的に3%
     MIN_VOLATILITY_THRESHOLD = 0.03
-    
+
     def __init__(self, returns: pd.DataFrame, periods_per_year: int = 12,
                  risk_free_rate: float = 0.0):
         """
@@ -1046,13 +1121,44 @@ class FundScreener:
         self.returns = returns
         self.periods_per_year = periods_per_year
         self.risk_free_rate = risk_free_rate
-        # [P1修正] テスト4 A3（統計キャッシュ検証）で参照される属性を必ず設定する。
-        # 旧実装では _stats_cache_hit が未定義のため getattr(..., None) が None を返し、
-        # `assert hit1 is False` が常に失敗していた。
-        # 現在はキャッシュ機構を持たないため常に False（毎回新規計算）を設定する。
-        self._stats_cache_hit: bool = False
-        self.statistics = self._calculate_statistics()
-    
+
+        # ── [BUG-1修正] クラスレベルキャッシュで統計を取得 ────────────────────
+        # キャッシュキー: リターンデータのハッシュ + 年間期数 + 無リスク金利。
+        # 旧実装は常に False を設定するだけでキャッシュ機構が存在しなかったため
+        # test_app.py テスト4 [A3] が必ず AssertionError になっていた。
+        _cache_key = self._make_stats_cache_key(returns, periods_per_year, risk_free_rate)
+        if _cache_key in FundScreener._statistics_cache:
+            # キャッシュヒット: 深いコピーを返して汚染防止
+            self.statistics = FundScreener._statistics_cache[_cache_key].copy()
+            self._stats_cache_hit: bool = True
+        else:
+            # キャッシュミス: 新規計算してキャッシュに格納
+            self.statistics = self._calculate_statistics()
+            FundScreener._statistics_cache[_cache_key] = self.statistics.copy()
+            self._stats_cache_hit = False
+
+    @staticmethod
+    def _make_stats_cache_key(
+        returns: pd.DataFrame,
+        periods_per_year: int,
+        risk_free_rate: float,
+    ) -> str:
+        """統計キャッシュのキーを生成する。
+
+        リターン DataFrame 全体（インデックス・列名・値）を
+        pd.util.hash_pandas_object でハッシュ化し、
+        年間期数・無リスク金利と結合した文字列を返す。
+
+        Returns
+        -------
+        str
+            "md5hex_periods_rf" 形式のキャッシュキー。
+        """
+        _h = hashlib.md5(
+            pd.util.hash_pandas_object(returns, index=True).values.tobytes()
+        ).hexdigest()
+        return f"{_h}_{periods_per_year}_{risk_free_rate:.6f}"
+
     def _calculate_statistics(self) -> pd.DataFrame:
         """全ファンドの統計量を計算（NaN安全: カラムごとに dropna して計算）
 
@@ -1748,17 +1854,22 @@ def calculate_fund_metrics(
     - ボラティリティ：ddof=1（FundScreener と統一）
     - Martin 比率の分子：CAGR（幾何平均）ベース
     - 出力値はすべて表示整形済み文字列（charts 層での再フォーマット不要）
+    - データ不足時（12 本未満）もすべての値を "—" 文字列で返す。
+      旧実装は np.nan を返していたため、呼び出し元で型が str / float と
+      まちまちになり、文字列連結時に "nan" が表示されるリスクがあった。
     """
+    # [ISSUE-1修正] データ不足時も文字列で返し、戻り値型を全ケースで統一する。
+    # 旧実装は np.nan（float）を返しており、正常時の整形済み文字列と型が異なっていた。
     if len(returns_series) < 12:
         return {
-            "シャープレシオ": np.nan,
-            "価格変動リスク": np.nan,
-            "最大下落率":     np.nan,
-            "Omega比率":      np.nan,
-            "Ulcer指数":      np.nan,
-            "Martin比率":     np.nan,
-            "GL比率":         np.nan,
-            "相関性":         np.nan,
+            "シャープレシオ": "—",
+            "価格変動リスク": "—",
+            "最大下落率":     "—",
+            "Omega比率":      "—",
+            "Ulcer指数":      "—",
+            "Martin比率":     "—",
+            "GL比率":         "—",
+            "相関性":         "—",
         }
 
     # ── リターン指標 ──────────────────────────────────────────
