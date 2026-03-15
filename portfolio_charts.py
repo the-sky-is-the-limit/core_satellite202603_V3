@@ -1,5 +1,5 @@
 """
-portfolio_charts.py  v2.0.3
+portfolio_charts.py  v2.1.0
 ============================
 プロファイル別詳細描画モジュール。
 portfolio_app.py から render_profile_detail() を import して使用する。
@@ -7,6 +7,18 @@ portfolio_app.py から render_profile_detail() を import して使用する。
 分割経緯:
   portfolio_optimizer_pro.py (3,417行) を
   portfolio_app.py / portfolio_charts.py の2ファイルに分割 (2026-03)
+
+改善内容（v2.1.0 — ステージ1リファクタ 2026-03）:
+✅ S1-01修正: ハードコード除去（顧客向けHTMLのコアファンド名）
+   - 旧実装: <div class="core-label">J01 Invesco Bond: {_core_pct}%...</div>
+   - コアファンドを別銘柄に変更しても表示が誤らないよう {core_fund} 変数に置換
+   - render_profile_detail() の引数 core_fund は既に正しく渡されていたが未使用だった
+
+✅ S1-02修正: 計算ロジックの一元管理（calc_metrics → calculate_fund_metrics）
+   - 旧実装: render_profile_detail() 内に calc_metrics() をネスト定義（約80行）
+   - portfolio_utils.calculate_fund_metrics() としてモジュールレベルに昇格
+   - 計算基準（シャープ・MDD・ddof 等）を FundScreener._calculate_statistics と統一維持
+   - 本ファイルは `from portfolio_utils import calculate_fund_metrics` で参照するだけ
 
 改善内容（v2.0.3）:
 ✅ D-01修正: tab6 内のネストタブを st.expander に変更
@@ -21,7 +33,7 @@ portfolio_app.py から render_profile_detail() を import して使用する。
 
 ✅ D-04修正: annual_vol_fund の ddof 明示
    - 旧実装: fund_returns_full.std() の ddof 未指定（pandas デフォルト=1 だが意図が不明確）
-   - ddof=1 を明示し calc_metrics・FundScreener と完全統一
+   - ddof=1 を明示し calculate_fund_metrics（portfolio_utils）・FundScreener と完全統一
 """
 import streamlit as st
 import pandas as pd
@@ -29,6 +41,7 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 import math
+from portfolio_utils import calculate_fund_metrics
 
 # ─── ヘルパー：ドーナツSVG ────────────────────────────────
 def _donut_svg(pct_val, color, size=72):
@@ -269,7 +282,7 @@ body{{background:#F4F6F9;color:#1A2540;font-family:'Noto Sans JP',sans-serif;fon
   <div style="text-align:right;">
 <div style="font-size:12px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;font-weight:600;">コアファンド比率</div>
 <div class="core-bar-track"><div class="core-bar-fill"></div></div>
-<div class="core-label">J01 Invesco Bond: {_core_pct}%　→ 残りサテライト資産</div>
+<div class="core-label">{core_fund}: {_core_pct}%　→ 残りサテライト資産</div>
   </div>
 </div>
 <div class="metrics-grid">
@@ -1023,97 +1036,14 @@ scales:{{
                                 f"{bench_ret:.1f}%" if not np.isnan(bench_ret) else "N/A"
                         })
                 
-                    # 定量分析計算
-                    def calc_metrics(returns_series, bench_returns_series=None, risk_free_rate=0.0):
-                        """定量分析指標を計算
-
-                        Notes
-                        -----
-                        シャープレシオは FundScreener._calculate_statistics と計算基準を統一。
-                        算術平均ベースの期待リターンでシャープを計算（ポートフォリオ全体の指標と一貫）。
-                        v3.3: Omega比率・Ulcer指数・Martin比率・GL比率を追加（改善G・H）。
-                        """
-                        if len(returns_series) < 12:
-                            return {
-                                "シャープレシオ":  np.nan,
-                                "価格変動リスク":  np.nan,
-                                "最大下落率":      np.nan,
-                                "Omega比率":       np.nan,
-                                "Ulcer指数":       np.nan,
-                                "Martin比率":      np.nan,
-                                "GL比率":          np.nan,
-                                "相関性":          np.nan,
-                            }
-
-                        # 年率期待リターン（算術平均 - シャープ計算用：FundScreenerと統一）
-                        annual_return_arith = returns_series.mean() * 12
-                        # 年率リターン（CAGR - Martin比率計算用）
-                        n_p = len(returns_series)
-                        cum_r = (1 + returns_series).prod() - 1
-                        annual_return_geom = (1 + cum_r) ** (12 / n_p) - 1 if n_p > 0 else 0
-                        # 年率ボラティリティ（ddof=1：FundScreenerと統一）
-                        annual_vol = returns_series.std(ddof=1) * np.sqrt(12)
-                        # シャープレシオ（算術平均ベース・rf控除済み：FundScreenerと統一）
-                        annual_excess = annual_return_arith - risk_free_rate
-                        sharpe = annual_excess / annual_vol if annual_vol > 0 else 0
-
-                        # 最大ドローダウン（先頭1.0付加で期初損失を正確に捕捉：portfolio_utils 修正J と統一）
-                        _cum_np  = np.concatenate([[1.0], (1 + returns_series.values).cumprod()])
-                        _rmax_np = np.maximum.accumulate(_cum_np)
-                        _dd_arr  = (_cum_np - _rmax_np) / _rmax_np
-                        drawdown = pd.Series(_dd_arr[1:], index=returns_series.index)
-                        max_dd = float(_dd_arr[1:].min()) * 100
-
-                        # ── [改善G] Omega比率 ─────────────────────────────
-                        tau   = 0.0
-                        pos   = np.maximum(returns_series - tau, 0).sum()
-                        neg   = np.maximum(tau - returns_series, 0).sum()
-                        omega = min(pos / neg, 99.99) if neg > 1e-8 else (99.99 if pos > 0 else 0.0)
-
-                        # ── [改善G] Ulcer指数・Martin比率 ─────────────────
-                        dd_series = drawdown  # 全期間のDD推移（≤0）
-                        ulcer     = float(np.sqrt(np.mean(dd_series ** 2)))
-                        martin    = (annual_return_geom / ulcer) if ulcer > 1e-8 else (
-                            99.99 if annual_return_geom > 0 else 0.0
-                        )
-                        martin    = min(max(martin, -99.99), 99.99)
-
-                        # ── [改善H] GL比率 ────────────────────────────────
-                        wins   = returns_series[returns_series > 0]
-                        losses = returns_series[returns_series < 0]
-                        avg_gain = wins.mean()        if len(wins)   > 0 else 0.0
-                        avg_loss = abs(losses.mean()) if len(losses) > 0 else 1e-8
-                        gl_ratio = min(avg_gain / avg_loss, 99.99) if avg_loss > 1e-8 and avg_gain > 0 else (
-                            99.99 if avg_gain > 0 else 0.0
-                        )
-
-                        # 相関係数（ベンチマークとの）
-                        correlation = np.nan
-                        if bench_returns_series is not None and len(bench_returns_series) >= 12:
-                            common_idx = returns_series.index.intersection(bench_returns_series.index)
-                            if len(common_idx) >= 12:
-                                correlation = returns_series.loc[common_idx].corr(
-                                    bench_returns_series.loc[common_idx]
-                                )
-
-                        return {
-                            "シャープレシオ": f"{sharpe:.2f}",
-                            "価格変動リスク": f"{annual_vol * 100:.1f}%",
-                            "最大下落率":     f"{max_dd:.1f}%",
-                            "Omega比率":      f"{omega:.2f}",
-                            "Ulcer指数":      f"{ulcer*100:.2f}%",
-                            "Martin比率":     f"{martin:.2f}",
-                            "GL比率":         f"{gl_ratio:.2f}",
-                            "相関性":         f"{correlation:.2f}" if not np.isnan(correlation) else "N/A",
-                        }
-                
+                    # 定量分析計算（calculate_fund_metrics は portfolio_utils で一元管理）
                     _rf = analyzer.risk_free_rate if analyzer is not None else 0.0
                     if benchmark != "なし":
                         bench_returns_full = bench_prices_full.pct_change().dropna()
-                        fund_metrics  = calc_metrics(fund_returns_full,  bench_returns_full, risk_free_rate=_rf)
-                        bench_metrics = calc_metrics(bench_returns_full, risk_free_rate=_rf)
+                        fund_metrics  = calculate_fund_metrics(fund_returns_full,  bench_returns_full, risk_free_rate=_rf)
+                        bench_metrics = calculate_fund_metrics(bench_returns_full, risk_free_rate=_rf)
                     else:
-                        fund_metrics  = calc_metrics(fund_returns_full, risk_free_rate=_rf)
+                        fund_metrics  = calculate_fund_metrics(fund_returns_full, risk_free_rate=_rf)
                         bench_metrics = {
                             "シャープレシオ": "N/A", 
                             "価格変動リスク": "N/A",
