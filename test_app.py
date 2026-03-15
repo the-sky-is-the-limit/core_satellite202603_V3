@@ -21,13 +21,14 @@ import numpy as np
 import pandas as pd
 
 from portfolio_utils import FundScreener, PortfolioAnalyzer
+from portfolio_data import CURRENCY_KEYWORDS  # M-2: portfolio_app.py と定義を共有
 
 # テスト対象 Excel ファイル：環境変数 TEST_DATA_FILE で上書き可能
 _DEFAULT_DATA_FILE = 'frends202512.xlsx'
 DATA_FILE = os.environ.get('TEST_DATA_FILE', _DEFAULT_DATA_FILE)
 
-# portfolio_app.py と同一の除外キーワード
-CURRENCY_KEYWORDS = ['USD-JPY', 'EUR-JPY', 'GBP-JPY', 'CHF-JPY', 'AUD-JPY']
+# portfolio_app.py と同一の除外キーワード（M-2: portfolio_data から import して一元管理）
+# 旧実装のモジュール定数 CURRENCY_KEYWORDS は削除し import に統一
 
 
 def test_data_loading():
@@ -89,7 +90,8 @@ def test_screening(df):
         returns = df_3y[valid_funds].pct_change().dropna()
 
         # スクリーニング
-        screener = FundScreener(returns)
+        # m-3: risk_free_rate を明示（本番デフォルト 0.5% に合わせる）
+        screener = FundScreener(returns, risk_free_rate=0.005)
 
         # コアファンドを仮選定（シャープレシオ上位）
         stats = screener.get_statistics()
@@ -122,7 +124,8 @@ def test_optimization(returns, core_fund, selected_funds):
         return False
 
     try:
-        analyzer = PortfolioAnalyzer(returns)
+        # m-3: risk_free_rate を明示（本番デフォルト 0.5% に合わせ FundScreener と統一）
+        analyzer = PortfolioAnalyzer(returns, risk_free_rate=0.005)
         core_idx = selected_funds.index(core_fund)
 
         # バランス型で最適化
