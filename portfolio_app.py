@@ -804,9 +804,23 @@ if uploaded_file is not None:
     # ─────────────────────────────────────────────────────────────
     # 全ファンド概観テーブル（計算は常に実行・表示はサイドバーのチェックボックスで制御）
     # ─────────────────────────────────────────────────────────────
-    # rf_rate_annual はサイドバー（下方）で定義されるが、ここで先行参照が必要なため
-    # セッションステートから取得する（初回はデフォルト0.5%、以降は前回設定値を使用）
-    rf_rate_annual = st.session_state.get('rf_rate', 0.005)
+    # [BUG-E修正] rf_rate スライダーをサマリーテーブル計算より前に配置することで
+    # キャッシュキーに「現在の」rf_rate を使用し、1 run 遅延を解消する。
+    # 旧実装は L807 で session_state から前回値を取得してキャッシュキーを生成し、
+    # L882 でサイドバーウィジェットの現在値を取得していたため、
+    # rf_rate 変更後の最初の run では古いキャッシュがヒットしていた。
+    # 修正後：スライダーを先に定義し rf_rate_annual を確定してからキャッシュキーを生成する。
+
+    # ── 無リスク金利設定（シャープレシオ計算に使用）── サマリー計算より前に配置 ──
+    # 現在の金利環境（日本国債・米国債）を踏まえてデフォルト0.5%に設定
+    with st.sidebar.expander("📐 シャープレシオ設定", expanded=False):
+        rf_rate_param = st.slider(
+            "無リスク金利（年率%）",
+            min_value=0.0, max_value=3.0, value=0.5, step=0.1,
+            help="シャープレシオ計算時に控除する無リスク金利。日本国債利回りを目安に設定してください（デフォルト：0.5%）"
+        )
+    rf_rate_annual = rf_rate_param / 100.0  # 小数に変換
+    st.session_state['rf_rate'] = rf_rate_annual
 
     with st.spinner("サマリーテーブルを計算中..."):
         _cache_key = build_overview_cache_key(df_price, months_param, rf_rate_annual)
@@ -870,18 +884,6 @@ if uploaded_file is not None:
             '中高相関':     bq_midhi,
             '高相関':       bq_high,
         }
-
-    # ── 無リスク金利設定（シャープレシオ計算に使用） ────────────────
-    # 現在の金利環境（日本国債・米国債）を踏まえてデフォルト0.5%に設定
-    with st.sidebar.expander("📐 シャープレシオ設定", expanded=False):
-        rf_rate_param = st.slider(
-            "無リスク金利（年率%）",
-            min_value=0.0, max_value=3.0, value=0.5, step=0.1,
-            help="シャープレシオ計算時に控除する無リスク金利。日本国債利回りを目安に設定してください（デフォルト：0.5%）"
-        )
-    rf_rate_annual = rf_rate_param / 100.0  # 小数に変換
-    # 次回のページトップ先行参照（overview table のキャッシュキー）で使えるよう保存
-    st.session_state['rf_rate'] = rf_rate_annual
 
     # ── サイドバー：推定・最適化設定 ──────────────────────────────
     st.sidebar.markdown("""
@@ -1065,9 +1067,14 @@ if uploaded_file is not None:
     valid_funds   = missing_rates[missing_rates == 0].index.tolist()
 
     # コアファンドが除外されてしまった場合のフォールバック（安全策）
+    # [BUG-D修正] 旧実装は missing_rates < 0.2 に閾値を緩和していたため、
+    # 欠損月を持つファンドが valid_funds に混入し、
+    # 後段の returns_selected.dropna() で分析期間が意図より短縮されるリスクがあった。
+    # 修正後：コアは強制追加しつつ、サテライトは欠損ゼロ基準を維持する。
+    # これにより欠損ファンド混入を防ぎながら、コアのフォールバックを確保できる。
     if core_fund not in valid_funds:
         valid_funds = [core_fund] + [
-            f for f in missing_rates[missing_rates < 0.2].index if f != core_fund
+            f for f in missing_rates[missing_rates == 0].index if f != core_fund
         ]
 
     df_returns = _df_core[valid_funds]   # コア期間でアンカー済み・NaN列排除済み
@@ -1092,7 +1099,8 @@ if uploaded_file is not None:
             )
 
     # スクリーニング実行
-    screener = FundScreener(df_returns)
+    # [BUG-F修正] rf_rate を渡し、シャープレシオ計算をサイドバー設定と統一
+    screener = FundScreener(df_returns, risk_free_rate=rf_rate)
     selected_funds = screener.screen_funds(
         core_fund,
         n_funds_final,
