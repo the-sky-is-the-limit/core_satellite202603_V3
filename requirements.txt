@@ -1,7 +1,12 @@
 streamlit>=1.30.0,<2.0.0
-pandas>=2.2.0,<3.0.0
+# pandas 3.0 で pct_change() の fill_method デフォルトが 'pad' から None に変更。
+# 内部NaNを持つ系列では NaN が次行にも伝播するため、コード側で fill_method=None を
+# 明示することで 2.x/3.x 両バージョンで同一の動作を保証している。（P1修正）
+pandas>=2.2.0,<4.0.0
 numpy>=1.24.0,<3.0.0
+# scipy 1.x 系は 1.17 まで確認済み。2.0 リリース前に再テストが必要。
 scipy>=1.10.0,<2.0.0
-plotly>=5.18.0,<6.0.0
+plotly>=5.18.0,<7.0.0
 openpyxl>=3.1.0,<4.0.0
+# scikit-learn 1.8 で LedoitWolf API に後方互換変更なし（1.x 系で確認済み）。
 scikit-learn>=1.0.0,<2.0.0
