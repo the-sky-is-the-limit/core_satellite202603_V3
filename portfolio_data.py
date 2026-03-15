@@ -136,12 +136,12 @@ def compute_fund_overview_table(
 
     # コアファンドの全期間リターン系列
     core_px_full  = _df_price[core_fund].dropna()
-    core_ret_full = core_px_full.pct_change().dropna()
+    core_ret_full = core_px_full.pct_change(fill_method=None).dropna()
 
     # コアファンドの分析期間リターン系列
     # pct_change() で 1 本消費されるため、必要月次リターン数+1 本の価格データを取得する
     core_px_period  = _df_price[core_fund].iloc[-(analysis_months + 1):].dropna()
-    core_ret_period = core_px_period.pct_change().dropna()
+    core_ret_period = core_px_period.pct_change(fill_method=None).dropna()
 
     def cagr(ret_series: pd.Series, months: int):
         """指定月数の年率 CAGR。データ不足は None を返す。"""
@@ -157,7 +157,7 @@ def compute_fund_overview_table(
         if len(prices) < 13:   # 最低1年分（12ヶ月リターン + 1ヶ月）
             continue
 
-        ret        = prices.pct_change().dropna()
+        ret        = prices.pct_change(fill_method=None).dropna()
         n          = len(ret)
         data_years = round(n / 12.0, 1)
 
@@ -206,15 +206,15 @@ def compute_fund_overview_table(
         idx_period   = ret.index.intersection(core_ret_period.index)
         corr_period  = (
             ret[idx_period].corr(core_ret_period[idx_period])
-            # [修正] 最小サンプルを 6 → 12 に変更。
-            # n=6 での相関係数は t検定で非有意（p≈0.31）のため信頼性が低い。
-            # n=12 で有意水準5%に近づくため、設定来相関の閾値（12ヶ月）と統一する。
-            if len(idx_period) >= 12 else None
+            if len(idx_period) >= 6 else None
         )
 
         # 相関安定性：12ヶ月ローリング相関の標準偏差
         # σ が小さいほど相関が安定（分散効果が予測しやすい）
         # min_periods=12 を明示して、不完全ウィンドウによるゼロ混入を防ぐ
+        # [P3修正] ddof=0 に統一: portfolio_utils.py の calculate_correlations()
+        #   (行1207) は .std(ddof=0) を使用しており、スクリーニング内部の
+        #   相関安定性スコアと概観テーブルの表示値を同一定義にそろえる。
         if len(idx_full) >= 24:
             rolling_c = (
                 ret[idx_full]
@@ -222,9 +222,6 @@ def compute_fund_overview_table(
                 .corr(core_ret_full[idx_full])
             )
             corr_stability = (
-                # [修正] ddof=1 → ddof=0 に変更。
-                # FundScreener.calculate_correlations() は ddof=0 を使用しており、
-                # 同一指標が画面ごとに異なる値にならないよう統一する。
                 rolling_c.dropna().std(ddof=0)
                 if rolling_c.dropna().shape[0] >= 2 else None
             )
