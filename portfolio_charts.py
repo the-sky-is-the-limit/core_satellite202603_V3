@@ -46,8 +46,8 @@ def donut_svg(pct_val, color, size=72):
         f'<circle cx="36" cy="36" r="26" fill="none" stroke="{color}" stroke-width="9"'
         f' stroke-dasharray="{arc:.1f} {circ-arc:.1f}"'
         f' stroke-dashoffset="{offset:.1f}" stroke-linecap="round"/>'
-        f'<text x="36" y="33" text-anchor="middle" font-size="11" font-weight="700" fill="{color}">{pct_val:.0f}%</text>'
-        f'<text x="36" y="44" text-anchor="middle" font-size="7" fill="#2f3e4d">コア</text>'
+        f'<text x="36" y="33" text-anchor="middle" font-size="13" font-weight="700" fill="{color}">{pct_val:.0f}%</text>'
+        f'<text x="36" y="44" text-anchor="middle" font-size="8" fill="#2f3e4d">コア</text>'
         f'</svg>'
     )
 
@@ -145,14 +145,14 @@ def _render_client_view(
         _hold_rows += (
             f'<div style="display:flex;align-items:center;gap:10px;padding:7px 0;'
             f'border-bottom:1px solid rgba(30,60,120,0.07);">'
-            f'<span style="font-family:monospace;font-size:12px;color:#1e3a5f;'
+            f'<span style="font-family:monospace;font-size:14px;color:#1e3a5f;'
             f'width:28px;flex-shrink:0;">{_h["code"]}</span>'
             f'<div style="flex:1;background:rgba(30,60,120,0.07);border-radius:3px;height:5px;overflow:hidden;">'
             f'<div style="width:{_bw}%;height:100%;background:{_color_hex};border-radius:3px;opacity:0.8;"></div>'
             f'</div>'
-            f'<span style="font-size:12px;color:#334155;width:160px;overflow:hidden;'
+            f'<span style="font-size:14px;color:#334155;width:160px;overflow:hidden;'
             f'white-space:nowrap;text-overflow:ellipsis;flex-shrink:0;">{_h["name"]}</span>'
-            f'<span style="font-family:monospace;font-size:13px;font-weight:700;'
+            f'<span style="font-family:monospace;font-size:15px;font-weight:700;'
             f'color:{_color_hex};width:40px;text-align:right;flex-shrink:0;">{_h["weight"]}%</span>'
             f'</div>'
         )
@@ -174,41 +174,41 @@ def _render_client_view(
     *{{margin:0;padding:0;box-sizing:border-box;}}
     body{{background:#F4F6F9;color:#1A2540;font-family:'Noto Sans JP',sans-serif;font-weight:300;padding:0 0 24px;}}
     .disc-banner{{background:rgba(122,92,30,0.06);border-bottom:1px solid rgba(122,92,30,0.20);
-      padding:7px 20px;font-size:12px;color:#6b4c10;display:flex;align-items:center;gap:8px;}}
+      padding:7px 20px;font-size:14px;color:#6b4c10;display:flex;align-items:center;gap:8px;}}
     .prof-header{{display:flex;align-items:flex-start;justify-content:space-between;
       padding:16px 20px 14px;background:#fff;border-bottom:1px solid rgba(30,60,120,0.10);margin-bottom:14px;}}
-    .prof-title{{font-family:'Noto Serif JP',serif;font-size:19px;font-weight:700;letter-spacing:0.04em;color:{_color_hex};}}
+    .prof-title{{font-family:'Noto Serif JP',serif;font-size:25px;font-weight:700;letter-spacing:0.04em;color:{_color_hex};}}
     .past-tag{{display:inline-block;background:rgba(122,92,30,0.08);border:1px solid rgba(122,92,30,0.22);
-      border-radius:3px;padding:1px 8px;font-size:11px;color:#7A5C1E;letter-spacing:0.06em;margin-left:8px;}}
-    .prof-sub{{font-size:13px;color:#334155;margin-top:4px;font-weight:400;line-height:1.6;}}
+      border-radius:3px;padding:1px 8px;font-size:15px;color:#7A5C1E;letter-spacing:0.06em;margin-left:8px;}}
+    .prof-sub{{font-size:15px;color:#334155;margin-top:4px;font-weight:400;line-height:1.6;}}
     .core-bar-track{{width:140px;background:rgba(30,60,120,0.08);border-radius:3px;height:5px;margin-top:5px;overflow:hidden;}}
     .core-bar-fill{{height:100%;border-radius:3px;background:{_color_hex};width:{min(_core_pct,100)}%;}}
-    .core-label{{font-size:12px;color:#334155;margin-top:4px;font-weight:400;}}
+    .core-label{{font-size:14px;color:#334155;margin-top:4px;font-weight:400;}}
     .metrics-grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:0 20px 14px;}}
     .mc{{background:#fff;border:1px solid rgba(30,60,120,0.10);border-radius:9px;padding:14px 14px 12px;
       box-shadow:0 1px 4px rgba(30,60,120,0.05);position:relative;overflow:hidden;}}
-    .mc .lbl{{font-size:11px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;font-weight:600;}}
-    .mc .val{{font-family:'Inter',sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.02em;line-height:1;}}
-    .mc .unit{{font-size:11px;font-weight:400;opacity:0.7;}}
-    .mc .note{{font-size:11px;color:#334155;margin-top:6px;line-height:1.5;}}
-    .mc .warn{{font-size:11px;color:#7a5c00;margin-top:4px;font-weight:500;}}
+    .mc .lbl{{font-size:15px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;font-weight:600;}}
+    .mc .val{{font-family:'Inter',sans-serif;font-size:25px;font-weight:700;letter-spacing:-0.02em;line-height:1;}}
+    .mc .unit{{font-size:15px;font-weight:400;opacity:0.7;}}
+    .mc .note{{font-size:15px;color:#334155;margin-top:6px;line-height:1.5;}}
+    .mc .warn{{font-size:15px;color:#7a5c00;margin-top:4px;font-weight:500;}}
     .lower-grid{{display:grid;grid-template-columns:2fr 1fr;gap:10px;padding:0 20px 14px;}}
     .card{{background:#fff;border:1px solid rgba(30,60,120,0.10);border-radius:9px;padding:16px 16px 12px;
       box-shadow:0 1px 4px rgba(30,60,120,0.05);}}
-    .card-title{{font-size:12px;color:#1e3a5f;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;font-weight:600;}}
-    .card-sub{{font-size:12px;color:#334155;margin-bottom:12px;line-height:1.5;}}
+    .card-title{{font-size:14px;color:#1e3a5f;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;font-weight:600;}}
+    .card-sub{{font-size:14px;color:#334155;margin-bottom:12px;line-height:1.5;}}
     .chart-wrap{{position:relative;height:220px;}}
     .risk-row{{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0 20px 14px;}}
     .rc{{background:#fff;border:1px solid rgba(30,60,120,0.10);border-radius:9px;padding:12px 14px;
       box-shadow:0 1px 4px rgba(30,60,120,0.05);}}
-    .rc .lbl{{font-size:11px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;font-weight:600;}}
-    .rc .val{{font-family:'Inter',sans-serif;font-size:18px;font-weight:700;letter-spacing:-0.01em;}}
-    .rc .note{{font-size:11px;color:#334155;margin-top:4px;line-height:1.5;}}
+    .rc .lbl{{font-size:15px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;font-weight:600;}}
+    .rc .val{{font-family:'Inter',sans-serif;font-size:21px;font-weight:700;letter-spacing:-0.01em;}}
+    .rc .note{{font-size:15px;color:#334155;margin-top:4px;line-height:1.5;}}
     .disc-box{{margin:0 20px;background:rgba(122,92,30,0.04);border:1px solid rgba(122,92,30,0.16);
       border-radius:9px;padding:16px 18px;}}
-    .disc-box h4{{font-size:11px;color:#7A5C1E;letter-spacing:0.08em;text-transform:uppercase;
+    .disc-box h4{{font-size:15px;color:#7A5C1E;letter-spacing:0.08em;text-transform:uppercase;
       margin-bottom:8px;display:flex;align-items:center;gap:5px;font-weight:700;}}
-    .disc-box p{{font-size:12px;color:#334155;line-height:1.9;margin-bottom:5px;}}
+    .disc-box p{{font-size:14px;color:#334155;line-height:1.9;margin-bottom:5px;}}
     .yearly-wrap{{padding:0 20px 14px;}}
     </style>
     </head>
@@ -223,7 +223,7 @@ def _render_client_view(
     <div class="prof-sub">{_desc}&nbsp;&nbsp;分析期間：{_period_start}〜{_period_end}（{_period_months}ヶ月）</div>
       </div>
       <div style="text-align:right;">
-    <div style="font-size:12px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;font-weight:600;">コアファンド比率</div>
+    <div style="font-size:14px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;font-weight:600;">コアファンド比率</div>
     <div class="core-bar-track"><div class="core-bar-fill"></div></div>
     <div class="core-label">{core_fund}: {_core_pct}%　→ 残りサテライト資産</div>
       </div>
@@ -274,7 +274,7 @@ def _render_client_view(
     <div class="risk-row">
       <div class="rc">
     <div class="lbl">最大ドローダウン (MDD)</div>
-    <div class="val" style="color:#9b2c2c;">{_mdd:.2f}<span style="font-size:11px;font-weight:400;">%</span></div>
+    <div class="val" style="color:#9b2c2c;">{_mdd:.2f}<span style="font-size:15px;font-weight:400;">%</span></div>
     <div class="note">過去最大の峰から谷への下落幅</div>
       </div>
       <div class="rc">
@@ -284,18 +284,18 @@ def _render_client_view(
       </div>
       <div class="rc">
     <div class="lbl">月次 VaR (95%)</div>
-    <div class="val" style="color:#c05621;">{_var95:.2f}<span style="font-size:11px;font-weight:400;">%</span></div>
+    <div class="val" style="color:#c05621;">{_var95:.2f}<span style="font-size:15px;font-weight:400;">%</span></div>
     <div class="note">月次で5%確率を超える損失の推計</div>
       </div>
       <div class="rc">
     <div class="lbl">月次 CVaR (95%)</div>
-    <div class="val" style="color:#c05621;">{_cvar95:.2f}<span style="font-size:11px;font-weight:400;">%</span></div>
+    <div class="val" style="color:#c05621;">{_cvar95:.2f}<span style="font-size:15px;font-weight:400;">%</span></div>
     <div class="note">VaR超過時の期待損失</div>
       </div>
     </div>
     <div class="yearly-wrap">
       <div class="card">
-    <div class="card-title">年次リターン（棒グラフ）<span style="margin-left:8px;background:rgba(122,92,30,0.08);border:1px solid rgba(122,92,30,0.22);border-radius:3px;padding:1px 7px;font-size:11px;color:#7A5C1E;letter-spacing:0.06em;">過去実績</span></div>
+    <div class="card-title">年次リターン（棒グラフ）<span style="margin-left:8px;background:rgba(122,92,30,0.08);border:1px solid rgba(122,92,30,0.22);border-radius:3px;padding:1px 7px;font-size:15px;color:#7A5C1E;letter-spacing:0.06em;">過去実績</span></div>
     <div class="card-sub">各暦年の実現リターン。将来の年次リターンを予測するものではありません。</div>
     <div class="chart-wrap" style="height:180px;"><canvas id="yearlyChart"></canvas></div>
       </div>
@@ -322,7 +322,7 @@ def _render_client_view(
     responsive:true,maintainAspectRatio:false,animation:{{duration:600}},
     interaction:{{mode:"index",intersect:false}},
     plugins:{{
-      legend:{{labels:{{color:"#4A5E7A",font:{{size:10}},boxWidth:14,padding:10}}}},
+      legend:{{labels:{{color:"#4A5E7A",font:{{size:16}},boxWidth:14,padding:10}}}},
       tooltip:{{backgroundColor:"#fff",borderColor:color,borderWidth:1,
         titleColor:"#1A2540",bodyColor:"#4A5E7A",
         callbacks:{{label:function(c){{
@@ -334,8 +334,8 @@ def _render_client_view(
       }}
     }},
     scales:{{
-      x:{{ticks:{{color:"#33465e",font:{{size:9}},maxTicksLimit:10,maxRotation:0}},grid:{{color:"rgba(30,60,120,0.06)"}}}},
-      y:{{ticks:{{color:"#33465e",font:{{size:9}},callback:function(v){{return v.toFixed(2);}}}},grid:{{color:"rgba(30,60,120,0.07)"}}}}
+      x:{{ticks:{{color:"#33465e",font:{{size:13}},maxTicksLimit:10,maxRotation:0}},grid:{{color:"rgba(30,60,120,0.06)"}}}},
+      y:{{ticks:{{color:"#33465e",font:{{size:13}},callback:function(v){{return v.toFixed(2);}}}},grid:{{color:"rgba(30,60,120,0.07)"}}}}
     }}
       }}}});
       var ctx2=document.getElementById("yearlyChart").getContext("2d");
@@ -354,8 +354,8 @@ def _render_client_view(
       }}
     }},
     scales:{{
-      x:{{ticks:{{color:"#33465e",font:{{size:10}}}},grid:{{display:false}}}},
-      y:{{ticks:{{color:"#33465e",font:{{size:9}},callback:function(v){{return v.toFixed(1)+"%";}}}},grid:{{color:"rgba(30,60,120,0.07)"}}}}
+      x:{{ticks:{{color:"#33465e",font:{{size:16}}}},grid:{{display:false}}}},
+      y:{{ticks:{{color:"#33465e",font:{{size:13}},callback:function(v){{return v.toFixed(1)+"%";}}}},grid:{{color:"rgba(30,60,120,0.07)"}}}}
     }}
       }}}});
     }})();
@@ -759,7 +759,7 @@ def _render_tab_correlation(
         zmax=1,
         text=np.round(corr_matrix.values, 2),
         texttemplate='%{text}',
-        textfont={"size": 7},
+        textfont={"size": 9},
         hovertemplate='%{y} vs %{x}<br>相関: %{z:.3f}<extra></extra>'
     ))
     fig_corr.update_layout(
@@ -1178,7 +1178,7 @@ def _render_tab_constituents(
                     x=1, y=-0.1,
                     showarrow=False,
                     xanchor='right',
-                    font=dict(size=9, color='gray')
+                    font=dict(size=12, color='gray')
                 )
 
                 st.plotly_chart(fig_perf, use_container_width=True, key=f"{selected_profile}_fund_perf_{idx}")
@@ -1348,47 +1348,47 @@ def _render_fund_client_view(
 *{{margin:0;padding:0;box-sizing:border-box;}}
 body{{background:#F4F6F9;color:#1A2540;font-family:'Noto Sans JP',sans-serif;font-weight:300;padding:0 0 20px;}}
 .disc-banner{{background:rgba(122,92,30,0.06);border-bottom:1px solid rgba(122,92,30,0.20);
-  padding:7px 20px;font-size:12px;color:#6b4c10;display:flex;align-items:center;gap:8px;}}
+  padding:7px 20px;font-size:14px;color:#6b4c10;display:flex;align-items:center;gap:8px;}}
 .fund-header{{display:flex;align-items:flex-start;justify-content:space-between;
   padding:14px 20px 12px;background:#fff;border-bottom:1px solid rgba(30,60,120,0.10);margin-bottom:12px;}}
 .fund-title{{font-family:'Noto Serif JP',serif;font-size:17px;font-weight:700;letter-spacing:0.03em;color:{_c};line-height:1.4;}}
 .past-tag{{display:inline-block;background:rgba(122,92,30,0.08);border:1px solid rgba(122,92,30,0.22);
-  border-radius:3px;padding:1px 8px;font-size:11px;color:#7A5C1E;letter-spacing:0.06em;margin-left:8px;}}
-.fund-sub{{font-size:13px;color:#334155;margin-top:4px;font-weight:400;line-height:1.6;}}
+  border-radius:3px;padding:1px 8px;font-size:15px;color:#7A5C1E;letter-spacing:0.06em;margin-left:8px;}}
+.fund-sub{{font-size:15px;color:#334155;margin-top:4px;font-weight:400;line-height:1.6;}}
 .weight-bar-track{{width:120px;background:rgba(30,60,120,0.08);border-radius:3px;height:5px;margin-top:6px;overflow:hidden;}}
 .weight-bar-fill{{height:100%;border-radius:3px;background:{_c};width:{min(float(_weight_str), 100)}%;}}
-.weight-label{{font-size:12px;color:#334155;margin-top:4px;}}
+.weight-label{{font-size:14px;color:#334155;margin-top:4px;}}
 .metrics-grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:0 20px 12px;}}
 .mc{{background:#fff;border:1px solid rgba(30,60,120,0.10);border-radius:9px;padding:12px 12px 10px;
   box-shadow:0 1px 4px rgba(30,60,120,0.05);}}
-.mc .lbl{{font-size:11px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:5px;font-weight:600;}}
+.mc .lbl{{font-size:15px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:5px;font-weight:600;}}
 .mc .val{{font-family:'Inter',sans-serif;font-size:20px;font-weight:700;letter-spacing:-0.02em;line-height:1;}}
-.mc .unit{{font-size:11px;font-weight:400;opacity:0.7;}}
-.mc .note{{font-size:11px;color:#334155;margin-top:5px;line-height:1.5;}}
-.mc .warn{{font-size:11px;color:#7a5c00;margin-top:3px;font-weight:500;}}
+.mc .unit{{font-size:15px;font-weight:400;opacity:0.7;}}
+.mc .note{{font-size:15px;color:#334155;margin-top:5px;line-height:1.5;}}
+.mc .warn{{font-size:15px;color:#7a5c00;margin-top:3px;font-weight:500;}}
 .lower-grid{{display:grid;grid-template-columns:1.3fr 1fr;gap:10px;padding:0 20px 12px;}}
 .card{{background:#fff;border:1px solid rgba(30,60,120,0.10);border-radius:9px;padding:14px 14px 10px;
   box-shadow:0 1px 4px rgba(30,60,120,0.05);}}
-.card-title{{font-size:12px;color:#1e3a5f;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:3px;font-weight:600;}}
-.card-sub{{font-size:11px;color:#334155;margin-bottom:10px;line-height:1.5;}}
+.card-title{{font-size:14px;color:#1e3a5f;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:3px;font-weight:600;}}
+.card-sub{{font-size:15px;color:#334155;margin-bottom:10px;line-height:1.5;}}
 .chart-wrap{{position:relative;height:200px;}}
 .corr-badges{{display:flex;flex-direction:column;gap:8px;margin-top:10px;}}
 .cb{{background:#f8fafc;border:1px solid rgba(30,60,120,0.10);border-radius:6px;
   padding:8px 12px;display:flex;justify-content:space-between;align-items:center;}}
-.cb .cl{{font-size:11px;color:#334155;font-weight:500;}}
+.cb .cl{{font-size:15px;color:#334155;font-weight:500;}}
 .cb .cv{{font-family:'Inter',sans-serif;font-size:16px;font-weight:700;}}
 .risk-row{{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0 20px 12px;}}
 .rc{{background:#fff;border:1px solid rgba(30,60,120,0.10);border-radius:9px;padding:10px 12px;
   box-shadow:0 1px 4px rgba(30,60,120,0.05);}}
-.rc .lbl{{font-size:11px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:5px;font-weight:600;}}
+.rc .lbl{{font-size:15px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:5px;font-weight:600;}}
 .rc .val{{font-family:'Inter',sans-serif;font-size:17px;font-weight:700;letter-spacing:-0.01em;}}
-.rc .note{{font-size:11px;color:#334155;margin-top:3px;line-height:1.5;}}
+.rc .note{{font-size:15px;color:#334155;margin-top:3px;line-height:1.5;}}
 .yearly-wrap{{padding:0 20px 12px;}}
 .disc-box{{margin:0 20px;background:rgba(122,92,30,0.04);border:1px solid rgba(122,92,30,0.16);
   border-radius:9px;padding:14px 16px;}}
-.disc-box h4{{font-size:11px;color:#7A5C1E;letter-spacing:0.08em;text-transform:uppercase;
+.disc-box h4{{font-size:15px;color:#7A5C1E;letter-spacing:0.08em;text-transform:uppercase;
   margin-bottom:6px;display:flex;align-items:center;gap:5px;font-weight:700;}}
-.disc-box p{{font-size:12px;color:#334155;line-height:1.9;margin-bottom:4px;}}
+.disc-box p{{font-size:14px;color:#334155;line-height:1.9;margin-bottom:4px;}}
 </style>
 </head>
 <body>
@@ -1400,7 +1400,7 @@ body{{background:#F4F6F9;color:#1A2540;font-family:'Noto Sans JP',sans-serif;fon
     <div class="fund-sub">分析期間：{period_start}〜{period_end}（{period_months}ヶ月）　コア：{core_fund}</div>
   </div>
   <div style="text-align:right;">
-    <div style="font-size:11px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;font-weight:600;">ポートフォリオ組入比率</div>
+    <div style="font-size:15px;color:#1e3a5f;letter-spacing:0.06em;text-transform:uppercase;font-weight:600;">ポートフォリオ組入比率</div>
     <div class="weight-bar-track"><div class="weight-bar-fill"></div></div>
     <div class="weight-label">{_weight_str}%</div>
   </div>
@@ -1465,7 +1465,7 @@ body{{background:#F4F6F9;color:#1A2540;font-family:'Noto Sans JP',sans-serif;fon
 <div class="risk-row">
   <div class="rc">
     <div class="lbl">最大ドローダウン (MDD)</div>
-    <div class="val" style="color:#9b2c2c;">{_mdd:.2f}<span style="font-size:11px;font-weight:400;">%</span></div>
+    <div class="val" style="color:#9b2c2c;">{_mdd:.2f}<span style="font-size:15px;font-weight:400;">%</span></div>
     <div class="note">過去最大の峰から谷への下落幅</div>
   </div>
   <div class="rc">
@@ -1475,19 +1475,19 @@ body{{background:#F4F6F9;color:#1A2540;font-family:'Noto Sans JP',sans-serif;fon
   </div>
   <div class="rc">
     <div class="lbl">月次 VaR (95%)</div>
-    <div class="val" style="color:#c05621;">{_var95:.2f}<span style="font-size:11px;font-weight:400;">%</span></div>
+    <div class="val" style="color:#c05621;">{_var95:.2f}<span style="font-size:15px;font-weight:400;">%</span></div>
     <div class="note">月次で5%確率を超える損失推計</div>
   </div>
   <div class="rc">
     <div class="lbl">月次 CVaR (95%)</div>
-    <div class="val" style="color:#c05621;">{_cvar95:.2f}<span style="font-size:11px;font-weight:400;">%</span></div>
+    <div class="val" style="color:#c05621;">{_cvar95:.2f}<span style="font-size:15px;font-weight:400;">%</span></div>
     <div class="note">VaR超過時の期待損失</div>
   </div>
 </div>
 
 <div class="yearly-wrap">
   <div class="card">
-    <div class="card-title">年次リターン（棒グラフ）<span style="margin-left:8px;background:rgba(122,92,30,0.08);border:1px solid rgba(122,92,30,0.22);border-radius:3px;padding:1px 7px;font-size:11px;color:#7A5C1E;letter-spacing:0.06em;">過去実績</span></div>
+    <div class="card-title">年次リターン（棒グラフ）<span style="margin-left:8px;background:rgba(122,92,30,0.08);border:1px solid rgba(122,92,30,0.22);border-radius:3px;padding:1px 7px;font-size:15px;color:#7A5C1E;letter-spacing:0.06em;">過去実績</span></div>
     <div class="card-sub">各暦年の実現リターン。将来の年次リターンを予測するものではありません。</div>
     <div class="chart-wrap" style="height:160px;"><canvas id="yearlyChart_{_uid}"></canvas></div>
   </div>
@@ -1519,7 +1519,7 @@ body{{background:#F4F6F9;color:#1A2540;font-family:'Noto Sans JP',sans-serif;fon
     responsive:true,maintainAspectRatio:false,animation:{{duration:500}},
     interaction:{{mode:"index",intersect:false}},
     plugins:{{
-      legend:{{labels:{{color:"#4A5E7A",font:{{size:10}},boxWidth:14,padding:8}}}},
+      legend:{{labels:{{color:"#4A5E7A",font:{{size:16}},boxWidth:14,padding:8}}}},
       tooltip:{{backgroundColor:"#fff",borderColor:color,borderWidth:1,
         titleColor:"#1A2540",bodyColor:"#4A5E7A",
         callbacks:{{label:function(c){{
@@ -1531,8 +1531,8 @@ body{{background:#F4F6F9;color:#1A2540;font-family:'Noto Sans JP',sans-serif;fon
       }}
     }},
     scales:{{
-      x:{{ticks:{{color:"#33465e",font:{{size:9}},maxTicksLimit:10,maxRotation:0}},grid:{{color:"rgba(30,60,120,0.06)"}}}},
-      y:{{ticks:{{color:"#33465e",font:{{size:9}},callback:function(v){{return v.toFixed(2);}}}},grid:{{color:"rgba(30,60,120,0.07)"}}}}
+      x:{{ticks:{{color:"#33465e",font:{{size:13}},maxTicksLimit:10,maxRotation:0}},grid:{{color:"rgba(30,60,120,0.06)"}}}},
+      y:{{ticks:{{color:"#33465e",font:{{size:13}},callback:function(v){{return v.toFixed(2);}}}},grid:{{color:"rgba(30,60,120,0.07)"}}}}
     }}
   }}}});
 
@@ -1557,8 +1557,8 @@ body{{background:#F4F6F9;color:#1A2540;font-family:'Noto Sans JP',sans-serif;fon
       }}
     }},
     scales:{{
-      x:{{ticks:{{color:"#33465e",font:{{size:8}},maxTicksLimit:8,maxRotation:0}},grid:{{color:"rgba(30,60,120,0.06)"}}}},
-      y:{{min:-1,max:1,ticks:{{color:"#33465e",font:{{size:8}},stepSize:0.5}},grid:{{color:"rgba(30,60,120,0.07)"}}}}
+      x:{{ticks:{{color:"#33465e",font:{{size:10}},maxTicksLimit:8,maxRotation:0}},grid:{{color:"rgba(30,60,120,0.06)"}}}},
+      y:{{min:-1,max:1,ticks:{{color:"#33465e",font:{{size:10}},stepSize:0.5}},grid:{{color:"rgba(30,60,120,0.07)"}}}}
     }}
   }}}});
 
@@ -1579,8 +1579,8 @@ body{{background:#F4F6F9;color:#1A2540;font-family:'Noto Sans JP',sans-serif;fon
       }}
     }},
     scales:{{
-      x:{{ticks:{{color:"#33465e",font:{{size:10}}}},grid:{{display:false}}}},
-      y:{{ticks:{{color:"#33465e",font:{{size:9}},callback:function(v){{return v.toFixed(1)+"%";}}}},grid:{{color:"rgba(30,60,120,0.07)"}}}}
+      x:{{ticks:{{color:"#33465e",font:{{size:16}}}},grid:{{display:false}}}},
+      y:{{ticks:{{color:"#33465e",font:{{size:13}},callback:function(v){{return v.toFixed(1)+"%";}}}},grid:{{color:"rgba(30,60,120,0.07)"}}}}
     }}
   }}}});
 }})();
@@ -1653,12 +1653,12 @@ def render_fund_drill_section(
     # ── セクションヘッダー ─────────────────────────────────────
     st.markdown(
         f'<div class="section-header">📊 構成ファンド 個別分析'
-        f'<span style="font-size:0.72rem;font-weight:500;color:#64748b;margin-left:10px;">'
+        f'<span style="font-size:0.83rem;font-weight:500;color:#64748b;margin-left:10px;">'
         f'{_sel_profile}　—　{len(_constituent)}本</span></div>',
         unsafe_allow_html=True,
     )
     st.markdown(
-        '<p style="font-size:0.77rem;color:#64748b;margin:-4px 0 10px 0;line-height:1.6;">'
+        '<p style="font-size:0.89rem;color:#64748b;margin:-4px 0 10px 0;line-height:1.6;">'
         '上のプロファイルタブの切り替えに連動して表示ファンドが変わります。'
         'コアファンドとの相関・リスク・リターンをファンド単位で確認できます。'
         '</p>',
@@ -1747,14 +1747,14 @@ def render_profile_detail(
     with col_mode_l:
         if st.session_state["view_mode"] == "client":
             st.markdown(
-                '<p style="font-size:0.82rem;font-weight:500;color:#1e3a5f;'
+                '<p style="font-size:0.94rem;font-weight:500;color:#1e3a5f;'
                 'margin:6px 0 0;line-height:1.5;">'
                 '👤 顧客向け表示モード　—　過去の実績を分かりやすく表示しています</p>',
                 unsafe_allow_html=True
             )
         else:
             st.markdown(
-                '<p style="font-size:0.82rem;font-weight:500;color:#1e3a5f;'
+                '<p style="font-size:0.94rem;font-weight:500;color:#1e3a5f;'
                 'margin:6px 0 0;line-height:1.5;">'
                 '⚙️ 担当者モード　—　詳細指標・構成銘柄分析を含む全情報を表示しています</p>',
                 unsafe_allow_html=True
