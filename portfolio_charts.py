@@ -710,7 +710,7 @@ def _render_tab_risk(
         # ローリングシャープ（月次リスクフリーレート控除、portfolio_utilsと定義を統一）
         rfr_monthly = rf_rate / 12
         rolling_sharpe = port_returns_series.rolling(window=12, min_periods=12).apply(
-            lambda x: ((x.mean() - rfr_monthly) * 12) / (x.std() * np.sqrt(12)) if x.std() > 0 else 0
+            lambda x: ((x.mean() - rfr_monthly) * 12) / (x.std(ddof=1) * np.sqrt(12)) if x.std(ddof=1) > 0 else 0
         )
 
         fig_rs = go.Figure()
