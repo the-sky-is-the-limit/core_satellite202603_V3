@@ -1189,7 +1189,8 @@ class FundScreener:
             "md5hex_periods_rf" 形式のキャッシュキー。
         """
         _h = hashlib.md5(
-            pd.util.hash_pandas_object(returns, index=True).values.tobytes()
+            pd.util.hash_pandas_object(returns, index=True).values.tobytes(),
+            usedforsecurity=False,   # [ISSUE-3修正] FIPS環境でのエラーを防止
         ).hexdigest()
         return f"{_h}_{periods_per_year}_{risk_free_rate:.6f}"
 
@@ -1923,7 +1924,9 @@ def calculate_fund_metrics(
     # 年率リターン（CAGR - Martin 比率計算用）
     n_p   = len(returns_series)
     cum_r = (1 + returns_series).prod() - 1
-    annual_return_geom = (1 + cum_r) ** (12 / n_p) - 1 if n_p > 0 else 0.0
+    # [BUG-3修正] 1+cum_r ≤ 0（累積損失100%超）は CAGR 未定義（複素数になる）→ 0.0 で補完
+    _cagr_base = 1 + cum_r
+    annual_return_geom = (_cagr_base ** (12 / n_p) - 1 if (n_p > 0 and _cagr_base > 0) else 0.0)
 
     # ── ボラティリティ・シャープ ──────────────────────────────
     # ddof=1 を明示（FundScreener と統一）
