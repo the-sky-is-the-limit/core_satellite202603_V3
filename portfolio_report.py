@@ -165,7 +165,9 @@ def build_report_data(
 
 
     # ─── 健全性チェック ＋ コアファンド情報バー（診断パネル）────────
-    if st.session_state.get('show_diagnosis', False):
+    # [ISSUE-6修正] 旧実装は st.session_state.get('show_diagnosis') を直接参照していたが、
+    # 引数として受け取った show_diagnosis を一貫して使用するよう修正する。
+    if show_diagnosis:
         # [ISSUE-6修正] aggressive_vol / conservative_vol を削除。
         # BUG-1修正（2026-03）で if/else ブランチを整理した際、
         # 単調性チェックが _vols リスト方式に変更されたにもかかわらず
