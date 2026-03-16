@@ -144,12 +144,16 @@ def compute_fund_overview_table(
     core_ret_period = core_px_period.pct_change(fill_method=None).dropna()
 
     def cagr(ret_series: pd.Series, months: int):
-        """指定月数の年率 CAGR。データ不足は None を返す。"""
+        """指定月数の年率 CAGR。データ不足・全損は None を返す。"""
         if len(ret_series) < months:
             return None
-        r   = ret_series.iloc[-months:]
-        cum = (1 + r).prod() - 1
-        return (1 + cum) ** (12.0 / months) - 1
+        r    = ret_series.iloc[-months:]
+        cum  = (1 + r).prod() - 1
+        base = 1 + cum
+        # [BUG-2修正] base ≤ 0（累積損失 100% 超）は CAGR 未定義（複素数になる）
+        if base <= 0:
+            return None
+        return base ** (12.0 / months) - 1
 
     rows = []
     for fund in fund_cols:
@@ -179,9 +183,11 @@ def compute_fund_overview_table(
         # シャープレシオだけが他の画面より系統的に低く表示されていた。
         # 修正後：ret.mean() * 12（年率算術平均）を分子に使うことで定義を統一する。
         annual_return_arith = ret.mean() * 12
+        # [ISSUE-1修正] 閾値を 1e-6 → 1e-8 に変更し portfolio_utils と統一。
+        # ~1e-17 の浮動小数点誤差ゼロでも天文学的シャープを防ぐ。
         sharpe = (
             (annual_return_arith - rf_rate) / vol
-            if vol > 1e-6 else None
+            if vol > 1e-8 else None
         )
 
         # 最大 DD：先頭に 1.0 を付加して期初損失を正確に捕捉
