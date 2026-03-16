@@ -48,7 +48,7 @@ def test_data_loading():
         df['Date'] = pd.to_datetime(df['Date'])
         df = df.set_index('Date').sort_index()
 
-        print(f"✓ データ読み込み成功")
+        print("✓ データ読み込み成功")
         print(f"  - データ期間: {df.index[0]} ～ {df.index[-1]}")
         print(f"  - データポイント数: {len(df)}")
         print(f"  - 全列数: {len(df.columns)}")
@@ -153,12 +153,12 @@ def test_optimization(returns, core_fund, selected_funds):
             max_individual=0.15
         )
 
-        print(f"✓ 最適化成功")
+        print("✓ 最適化成功")
 
         # 統計計算
         stats = analyzer.calculate_portfolio_stats(weights)
 
-        print(f"\nポートフォリオ統計:")
+        print("\nポートフォリオ統計:")
         print(f"  - 年率リターン: {stats['年率リターン']*100:.2f}%")
         print(f"  - 年率ボラティリティ: {stats['年率ボラティリティ']*100:.2f}%")
         print(f"  - シャープレシオ: {stats['シャープレシオ']:.3f}")
@@ -167,7 +167,7 @@ def test_optimization(returns, core_fund, selected_funds):
         print(f"  - カルマー比率: {stats['カルマー比率']:.3f}")
 
         # 主要構成
-        print(f"\n主要構成（上位5ファンド）:")
+        print("\n主要構成（上位5ファンド）:")
         weights_sorted = sorted(zip(selected_funds, weights), key=lambda x: x[1], reverse=True)
         for fund, w in weights_sorted[:5]:
             if w > 0.01:
