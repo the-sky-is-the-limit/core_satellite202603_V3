@@ -1608,6 +1608,7 @@ if uploaded_file is not None:
                 period_end       = _period_end,
                 period_months    = _period_months,
                 profile_name     = _profile_name,   # タブ名を直接指定
+                rf_rate          = rf_rate,          # [BUG-5修正] 無リスク金利を伝播
             )
 
     # リスクパリティ & テールリスク最小型のタブ描画（チェックON時のみ）
