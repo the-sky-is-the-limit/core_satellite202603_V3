@@ -1471,9 +1471,12 @@ if uploaded_file is not None:
     _tr_portfolio = portfolios.get("テールリスク最小型", None)   # optimization_configs に常に含まれる
     if _show_rp:
         try:
+            # data_hash に LW設定・rf_rate も含めることで
+            # これらの変更時にキャッシュが正しく無効化される。
+            # （_lw / _rf はアンダースコア引数のため st.cache_data がハッシュ化しない）
             _ret_hash = hashlib.sha256(
                 pd.util.hash_pandas_object(returns_selected, index=True).values.tobytes()
-            ).hexdigest()[:16]
+            ).hexdigest()[:16] + f"|lw={_use_lw}|rf={rf_rate:.4f}"
             _rp_result = compute_rp_portfolio(
                 returns_selected,
                 tuple(selected_funds),
