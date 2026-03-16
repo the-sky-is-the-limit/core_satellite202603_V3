@@ -318,7 +318,9 @@ class PortfolioAnalyzer:
         excess_return = port_return_arith - self.risk_free_rate
         
         # シャープレシオ（算術平均ベース）
-        sharpe = excess_return / port_vol if port_vol > 0 else 0
+        # 閾値 1e-8: 定数系列の std は浮動小数点誤差で ~1e-17 の非ゼロ値を返すため
+        # > 0 では天文学的な値が生成される。1e-8（年率0.001%相当）を下限とする。
+        sharpe = excess_return / port_vol if port_vol > 1e-8 else 0
         
         # ソルティノレシオ（算術平均ベース）
         # 下方偏差の定義（Sortino & van der Meer, 1991）:
@@ -1224,8 +1226,12 @@ class FundScreener:
         stats['年率ボラ'] = self.returns.std(ddof=1) * np.sqrt(self.periods_per_year)
 
         # 超過リターン・シャープレシオ（算術平均ベース）
+        # vol < 1e-8（定数系列の浮動小数点誤差由来のゼロ近傍含む）は NaN 扱い。
+        # replace([inf,-inf], nan) だけでは ~1e-17 の非ゼロ vol によって
+        # Inf でなく天文学的な有限値が返るケースがあるため where でガードする。
         stats['超過リターン'] = stats['年率期待リターン'] - self.risk_free_rate
-        stats['シャープレシオ'] = (stats['超過リターン'] / stats['年率ボラ']).replace([np.inf, -np.inf], np.nan)
+        _vol_safe = stats['年率ボラ'].where(stats['年率ボラ'] > 1e-8)
+        stats['シャープレシオ'] = (stats['超過リターン'] / _vol_safe).replace([np.inf, -np.inf], np.nan)
 
         # ── ⑤ 全ファンド統合ループ ───────────────────────────────────────────
         # 旧実装では Sortino / 最大DD / カルマー / Omega / Ulcer / Martin / GL の
@@ -1921,9 +1927,12 @@ def calculate_fund_metrics(
 
     # ── ボラティリティ・シャープ ──────────────────────────────
     # ddof=1 を明示（FundScreener と統一）
+    # 閾値を 1e-8 に設定: 定数系列の std は浮動小数点誤差により
+    # ~1e-17 の非ゼロ値を返すことがあり、> 0 では天文学的な
+    # シャープレシオが生成されてしまう（例：毎月-10%系列で-2.46e16）。
     annual_vol    = returns_series.std(ddof=1) * np.sqrt(12)
     annual_excess = annual_return_arith - risk_free_rate
-    sharpe        = annual_excess / annual_vol if annual_vol > 0 else 0.0
+    sharpe        = annual_excess / annual_vol if annual_vol > 1e-8 else 0.0
 
     # ── 最大ドローダウン ──────────────────────────────────────
     # 先頭 1.0 付加：観測開始前を基準高値とみなし、期初の下落を捕捉する
