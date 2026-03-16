@@ -212,7 +212,7 @@ def build_report_data(
             st.markdown(
                 f'<div class="health-warn">⚠️ <b>ボラティリティの逆転</b>　'
                 f'保守→積極の順にリスクが増加すべきところ、以下のプロファイル間で逆転しています。<br>'
-                f'<span style="font-size:0.8rem;">{_viol_str}</span><br>'
+                f'<span style="font-size:0.92rem;">{_viol_str}</span><br>'
                 f'コアファンドの変更またはスクリーニング条件の調整をご検討ください。</div>',
                 unsafe_allow_html=True
             )
@@ -223,7 +223,7 @@ def build_report_data(
             st.markdown(
                 f'<div class="health-warn">⚠️ <b>リターンの逆転</b>　'
                 f'保守→積極の順にリターンが増加すべきところ、以下のプロファイル間で逆転しています。<br>'
-                f'<span style="font-size:0.8rem;">{_viol_str}</span><br>'
+                f'<span style="font-size:0.92rem;">{_viol_str}</span><br>'
                 f'サテライトファンドの質（シャープレシオ）をご確認ください。</div>',
                 unsafe_allow_html=True
             )
@@ -500,11 +500,11 @@ def render_report_panel(
                 f'      <span class="profile-card-row-val">{n_funds_}本</span>'
                 f'    </div>'
                 f'    <div class="risk-bar-wrap">'
-                f'      <div style="font-size:0.70rem;color:#445563;margin-bottom:3px;">リスク水準</div>'
+                f'      <div style="font-size:1.06rem;color:#445563;margin-bottom:3px;">リスク水準</div>'
                 f'      <div class="risk-bar-track">'
                 f'        <div class="risk-bar-fill" style="width:{bar_w:.0f}%;background:{c_};"></div>'
                 f'      </div>'
-                f'      <div style="text-align:right;font-size:0.65rem;font-weight:700;color:{c_};margin-top:2px;">{vol_:.1f}%</div>'
+                f'      <div style="text-align:right;font-size:0.75rem;font-weight:700;color:{c_};margin-top:2px;">{vol_:.1f}%</div>'
                 f'    </div>'
                 f'  </div>'
                 f'</div>'
@@ -545,8 +545,8 @@ def render_report_panel(
             f'background:#faf8f4;border:1px solid #e0dbd0;'
             f'border-left:5px solid {_spmeta["color"]};'
             f'border-radius:6px;padding:16px 22px;margin-top:4px;'
-            f'font-size:0.92rem;font-weight:600;color:#2c3e50;line-height:1.95;">'
-            f'<span style="font-size:1.0rem;font-weight:800;color:{_spmeta["color"]};margin-right:8px;">{_spname}</span>'
+            f'font-size:1.06rem;font-weight:600;color:#2c3e50;line-height:1.95;">'
+            f'<span style="font-size:1.15rem;font-weight:800;color:{_spmeta["color"]};margin-right:8px;">{_spname}</span>'
             f'{_sp_text}'
             f'</div>',
             unsafe_allow_html=True
@@ -569,9 +569,9 @@ def render_report_panel(
             st.markdown(
                 '<div style="margin-top:16px;padding:6px 0 4px 0;'
                 'border-top:1px solid rgba(99,102,241,0.25);">'
-                '<span style="font-size:0.68rem;font-weight:800;letter-spacing:0.1em;'
+                '<span style="font-size:0.90rem;font-weight:800;letter-spacing:0.1em;'
                 'text-transform:uppercase;color:#6366f1;">⚖️ リスクパリティ配分（参考）</span>'
-                '<span style="font-size:0.65rem;color:#64748b;margin-left:8px;">'
+                '<span style="font-size:0.75rem;color:#64748b;margin-left:8px;">'
                 'サテライトのリスク寄与を均等化した配分 / テールリスク最小型（CVaR最小化）</span>'
                 '</div>',
                 unsafe_allow_html=True,
@@ -640,7 +640,7 @@ def render_report_panel(
                         f'</div>'
                     )
                 except Exception as _rp_err:
-                    _rp_card_html = f'<div style="color:#c0392b;font-size:0.8rem;">⚠️ リスクパリティ最適化失敗: {_rp_err}</div>'
+                    _rp_card_html = f'<div style="color:#c0392b;font-size:0.92rem;">⚠️ リスクパリティ最適化失敗: {_rp_err}</div>'
             else:
                 _rp_card_html = ""
 
@@ -712,7 +712,7 @@ def render_report_panel(
                         f'</div>'
                     )
                 except Exception as _tr_err:
-                    _tr_card_html = f'<div style="color:#c0392b;font-size:0.8rem;">⚠️ テールリスク最小型表示失敗: {_tr_err}</div>'
+                    _tr_card_html = f'<div style="color:#c0392b;font-size:0.92rem;">⚠️ テールリスク最小型表示失敗: {_tr_err}</div>'
 
             # ── 2カードを横並び表示 ────────────────────────────────
             if _rp_card_html or _tr_card_html:
@@ -749,7 +749,7 @@ def render_report_panel(
                 gl_  = st_.get('GL比率',     0.0)
                 ret_sign = "+" if ret_ >= 0 else ""
                 sr_color = "#1e8449" if sr_ >= 1.0 else ("#d35400" if sr_ >= 0.5 else "#c0392b")
-                st.markdown(f'<div style="font-size:0.78rem;font-weight:700;color:{c_};margin:10px 0 4px;">{pname}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="font-size:0.90rem;font-weight:700;color:{c_};margin:10px 0 4px;">{pname}</div>', unsafe_allow_html=True)
                 badges_html = (
                     '<div class="metric-badges-wrap">'
                     + _badge("年率リターン", f"{ret_sign}{ret_:.2f}%", "CAGR", c_)
@@ -1010,12 +1010,12 @@ def render_report_panel(
                 'コア相関\n分析期間'    : lambda v: f"{v:.2f}"    if pd.notna(v) else "—",
                 '月次勝率\n設定来(%)'   : lambda v: f"{v:.0f}%"   if pd.notna(v) else "—",
             })
-            .set_properties(**{'text-align': 'center', 'font-size': '0.82em', 'padding': '3px 6px'})
+            .set_properties(**{'text-align': 'center', 'font-size': '0.94em', 'padding': '3px 6px'})
             .set_table_styles([
                 {'selector': 'th.col_heading',
-                 'props': 'text-align: center; font-size: 0.80em; white-space: pre-line; padding: 4px 6px;'},
+                 'props': 'text-align: center; font-size: 0.92em; white-space: pre-line; padding: 4px 6px;'},
                 {'selector': 'th.row_heading',
-                 'props': 'text-align: left; font-size: 0.80em;'},
+                 'props': 'text-align: left; font-size: 0.92em;'},
             ])
         )
 
@@ -1075,7 +1075,7 @@ def render_report_panel(
                                 line=dict(color='#fff', width=2)),
                     text=[pname],
                     textposition="top center",
-                    textfont=dict(size=11, color=meta["color"]),
+                    textfont=dict(size=13, color=meta["color"]),
                     hovertemplate=(
                         f'<b>{pname}</b><br>'
                         'ボラ: %{x:.1f}%<br>リターン: %{y:.1f}%<extra></extra>'
@@ -1130,16 +1130,16 @@ def render_report_panel(
                 yaxis=dict(gridcolor='#e8ecf0', zeroline=False),
                 # legend を X軸タイトルと重ならないよう下マージンを広げて配置
                 legend=dict(orientation='h', yanchor='top', y=-0.18, xanchor='center', x=0.5,
-                            font=dict(size=10)),
+                            font=dict(size=12)),
                 margin=dict(t=20, b=90, l=50, r=20)
             )
             st.plotly_chart(fig_scatter, use_container_width=True)
 
         with col_sr:
             st.markdown(
-                '<div style="font-size:0.82rem;font-weight:700;color:#1e3a5f;margin-bottom:10px;">'
+                '<div style="font-size:0.94rem;font-weight:700;color:#1e3a5f;margin-bottom:10px;">'
                 'シャープレシオ比較<br>'
-                '<span style="font-size:0.68rem;font-weight:400;color:#2f3e4d;">'
+                '<span style="font-size:0.90rem;font-weight:400;color:#2f3e4d;">'
                 'リスク1単位あたりのリターン効率</span></div>',
                 unsafe_allow_html=True
             )
