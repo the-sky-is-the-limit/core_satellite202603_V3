@@ -227,10 +227,9 @@ def compute_fund_overview_table(
                 .rolling(12, min_periods=12)
                 .corr(core_ret_full[idx_full])
             )
-            corr_stability = (
-                rolling_c.dropna().std(ddof=0)
-                if rolling_c.dropna().shape[0] >= 2 else None
-            )
+            # [NEW-ISSUE-1修正] dropna() を一度だけ呼び出して変数に保存し二重評価を解消
+            _rc_valid = rolling_c.dropna()
+            corr_stability = _rc_valid.std(ddof=0) if len(_rc_valid) >= 2 else None
         else:
             corr_stability = None
 
