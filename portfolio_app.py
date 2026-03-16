@@ -44,24 +44,24 @@ st.markdown("""
         background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1f4e79 100%);
         padding: 22px 32px 18px;
         border-bottom: 3px solid #b3904a;
-        margin: -1rem -1rem 1.2rem -1rem;
+        margin: -1rem -1rem 1.38rem -1rem;
         color: #fff;
     }
     .hfd-header-eyebrow {
-        font-size: 0.65rem;
+        font-size: 0.86rem;
         letter-spacing: 0.18em;
         opacity: 0.6;
         margin-bottom: 4px;
         font-weight: 600;
     }
     .hfd-header-title {
-        font-size: 1.45rem;
+        font-size: 1.67rem;
         font-weight: 800;
         letter-spacing: 0.04em;
         line-height: 1.2;
     }
     .hfd-header-sub {
-        font-size: 0.75rem;
+        font-size: 0.86rem;
         opacity: 0.6;
         margin-top: 6px;
     }
@@ -77,20 +77,20 @@ st.markdown("""
         align-items: center;
         gap: 14px;
         flex-wrap: wrap;
-        font-size: 0.82rem;
+        font-size: 0.94rem;
     }
-    .core-bar-label { font-weight: 700; color: #7a5c00; font-size: 0.78rem; }
-    .core-bar-name  { font-weight: 700; color: #0f172a; font-size: 0.88rem; }
+    .core-bar-label { font-weight: 700; color: #7a5c00; font-size: 0.90rem; }
+    .core-bar-name  { font-weight: 700; color: #0f172a; font-size: 1.01rem; }
     .core-bar-item  { color: #475569; }
     .core-bar-item b { color: #0f172a; }
     /* ── セクションヘッダー ── */
     .section-header {
-        font-size: 1.05rem;
+        font-size: 1.21rem;
         font-weight: 800;
         color: #0f172a;
         border-left: 4px solid #b3904a;
         padding: 4px 0 4px 12px;
-        margin: 1.4rem 0 0.8rem 0;
+        margin: 1.4rem 0 0.92rem 0;
         letter-spacing: 0.03em;
     }
     /* ── プロファイルカード ── */
@@ -114,18 +114,18 @@ st.markdown("""
         color: #fff;
     }
     .profile-card-eyebrow {
-        font-size: 0.6rem;
+        font-size: 0.69rem;
         font-weight: 700;
         letter-spacing: 0.12em;
         opacity: 0.8;
         margin-bottom: 2px;
     }
     .profile-card-title {
-        font-size: 1.0rem;
+        font-size: 1.15rem;
         font-weight: 800;
     }
     .profile-card-range {
-        font-size: 0.65rem;
+        font-size: 0.86rem;
         opacity: 0.75;
         margin-top: 2px;
     }
@@ -136,12 +136,12 @@ st.markdown("""
         margin-top: 8px;
     }
     .profile-card-ret {
-        font-size: 1.6rem;
+        font-size: 1.84rem;
         font-weight: 800;
         line-height: 1;
     }
     .profile-card-ret-label {
-        font-size: 0.6rem;
+        font-size: 0.69rem;
         opacity: 0.75;
         margin-top: 2px;
     }
@@ -152,15 +152,15 @@ st.markdown("""
         display: flex;
         justify-content: space-between;
         margin-bottom: 5px;
-        font-size: 0.75rem;
+        font-size: 0.86rem;
     }
     .profile-card-row-label { color: #2f3e4d; }
-    .profile-card-row-label-sub { font-size: 0.6rem; color: #4f6270; display: block; line-height: 1.3; margin-top: 1px; }
+    .profile-card-row-label-sub { font-size: 0.69rem; color: #4f6270; display: block; line-height: 1.3; margin-top: 1px; }
     .profile-card-row-val   { font-weight: 700; color: #1e3a5f; text-align: right; flex-shrink: 0; margin-left: 4px; }
     .risk-bar-wrap { margin-top: 8px; }
     /* ── プロファイル解説文 ── */
     .profile-card-commentary {
-        font-size: 0.7rem;
+        font-size: 0.80rem;
         color: #2f3e4d;
         line-height: 1.65;
         padding: 9px 12px 10px;
@@ -173,7 +173,7 @@ st.markdown("""
         border: 1px solid #e8c060;
         border-radius: 6px;
         padding: 8px 14px;
-        font-size: 0.72rem;
+        font-size: 0.95rem;
         color: #6a4000;
         line-height: 1.7;
         margin-bottom: 10px;
@@ -187,7 +187,7 @@ st.markdown("""
         gap: 8px;
         flex-wrap: wrap;
         align-items: center;
-        font-size: 0.68rem;
+        font-size: 0.90rem;
         color: #2f3e4d;
         margin-top: 6px;
         margin-bottom: 14px;
@@ -196,7 +196,7 @@ st.markdown("""
         padding: 2px 8px;
         border-radius: 4px;
         font-weight: 700;
-        font-size: 0.65rem;
+        font-size: 0.86rem;
     }
     .risk-bar-track {
         height: 5px;
@@ -224,7 +224,7 @@ st.markdown("""
         flex: 1;
     }
     .metric-badge-label {
-        font-size: 0.62rem;
+        font-size: 0.71rem;
         color: #2f3e4d;
         font-weight: 700;
         letter-spacing: 0.07em;
@@ -232,13 +232,13 @@ st.markdown("""
         margin-bottom: 3px;
     }
     .metric-badge-value {
-        font-size: 1.2rem;
+        font-size: 1.38rem;
         font-weight: 800;
         color: #1e3a5f;
         line-height: 1.1;
     }
     .metric-badge-sub {
-        font-size: 0.62rem;
+        font-size: 0.71rem;
         color: #445563;
         margin-top: 2px;
     }
@@ -249,7 +249,7 @@ st.markdown("""
         border-left: 4px solid #22c55e;
         border-radius: 6px;
         padding: 10px 14px;
-        font-size: 0.82rem;
+        font-size: 0.94rem;
         color: #166534;
         margin-bottom: 10px;
     }
@@ -259,7 +259,7 @@ st.markdown("""
         border-left: 4px solid #f59e0b;
         border-radius: 6px;
         padding: 10px 14px;
-        font-size: 0.82rem;
+        font-size: 0.94rem;
         color: #92400e;
         margin-bottom: 10px;
     }
@@ -269,7 +269,7 @@ st.markdown("""
     .sr-compare-header {
         display: flex;
         justify-content: space-between;
-        font-size: 0.75rem;
+        font-size: 0.86rem;
         margin-bottom: 3px;
     }
     .sr-compare-bar-track {
@@ -287,18 +287,18 @@ st.markdown("""
         padding: 9px 12px;
         background: #f0f4f8;
         border-radius: 6px;
-        font-size: 0.72rem;
+        font-size: 0.95rem;
         color: #556;
         line-height: 1.6;
     }
     /* ── 従来互換 ── */
     .sub-header {
-        font-size: 1.1rem;
+        font-size: 1.27rem;
         font-weight: 800;
         color: #0f172a;
         border-left: 4px solid #b3904a;
         padding: 4px 0 4px 12px;
-        margin: 1.4rem 0 0.8rem 0;
+        margin: 1.4rem 0 0.92rem 0;
     }
     /* ── 設定パネル全体 ── */
     .settings-box {
@@ -329,7 +329,7 @@ st.markdown("""
     }
     .settings-panel-header-text { flex: 1; }
     .settings-panel-header-title {
-        font-size: 0.88rem;
+        font-size: 1.01rem;
         font-weight: 800;
         color: #d4af6a;
         letter-spacing: 0.06em;
@@ -337,7 +337,7 @@ st.markdown("""
         line-height: 1.2;
     }
     .settings-panel-header-sub {
-        font-size: 0.72rem;
+        font-size: 0.95rem;
         color: rgba(255,255,255,0.75);
         margin-top: 3px;
         font-weight: 500;
@@ -353,7 +353,7 @@ st.markdown("""
     .settings-box .stMarkdown p {
         color: rgba(255,255,255,0.85) !important;
         font-weight: 600 !important;
-        font-size: 0.8rem !important;
+        font-size: 0.92rem !important;
         letter-spacing: 0.04em !important;
     }
     /* selectbox ドロップダウンの値テキスト */
@@ -380,18 +380,18 @@ st.markdown("""
         display: block;
     }
     .upload-zone-title {
-        font-size: 0.88rem;
+        font-size: 1.01rem;
         font-weight: 700;
         color: #d4af6a;
         margin-bottom: 4px;
     }
     .upload-zone-sub {
-        font-size: 0.7rem;
+        font-size: 0.80rem;
         color: rgba(255,255,255,0.4);
     }
     /* ── 設定グリッド ── */
     .settings-grid-label {
-        font-size: 0.7rem;
+        font-size: 0.80rem;
         font-weight: 700;
         letter-spacing: 0.1em;
         text-transform: uppercase;
@@ -416,7 +416,7 @@ st.markdown("""
     .core-fund-badge {
         background: linear-gradient(135deg, #b3904a, #8a6a30);
         color: #0f172a;
-        font-size: 0.62rem;
+        font-size: 0.71rem;
         font-weight: 800;
         letter-spacing: 0.1em;
         text-transform: uppercase;
@@ -425,12 +425,12 @@ st.markdown("""
         flex-shrink: 0;
     }
     .core-fund-section-title {
-        font-size: 0.85rem;
+        font-size: 0.98rem;
         font-weight: 700;
         color: #d4af6a;
     }
     .core-fund-hint {
-        font-size: 0.7rem;
+        font-size: 0.80rem;
         color: rgba(255,255,255,0.45);
         line-height: 1.5;
         margin-top: 6px;
@@ -446,7 +446,7 @@ st.markdown("""
         border-top: 1px solid rgba(179,144,74,0.15);
     }
     .run-button-hint {
-        font-size: 0.68rem;
+        font-size: 0.90rem;
         color: rgba(255,255,255,0.35);
         text-align: center;
         margin-top: 8px;
@@ -458,7 +458,7 @@ st.markdown("""
         border-left: 4px solid #22c55e;
         border-radius: 6px;
         padding: 10px 16px;
-        font-size: 0.78rem;
+        font-size: 0.90rem;
         color: #86efac;
         margin-bottom: 16px;
         display: flex;
@@ -484,7 +484,7 @@ st.markdown("""
         background: #f8fafc;
         border: 1px solid #e2e8f0;
         border-radius: 6px;
-        font-size: 0.7rem;
+        font-size: 0.80rem;
         color: #475569;
         line-height: 1.7;
     }
@@ -509,14 +509,14 @@ st.markdown("""
         box-shadow: 0 2px 8px rgba(179,144,74,0.4);
     }
     .report-panel-title {
-        font-size: 1.02rem;
+        font-size: 1.17rem;
         font-weight: 800;
         color: #d4af6a;
         letter-spacing: 0.04em;
         line-height: 1.2;
     }
     .report-panel-meta {
-        font-size: 0.70rem;
+        font-size: 1.06rem;
         color: rgba(255,255,255,0.52);
         margin-top: 3px;
     }
@@ -548,7 +548,7 @@ st.markdown("""
         border-radius: 4px 4px 0 0 !important;
         padding: 8px 16px !important;
         font-weight: 600 !important;
-        font-size: 0.83rem !important;
+        font-size: 0.95rem !important;
         color: #94a3b8 !important;
         border: none !important;
         margin-bottom: -2px !important;
@@ -568,7 +568,7 @@ st.markdown("""
     }
     /* タブ内サブヘッダー */
     .tab-sub-header {
-        font-size: 0.80rem;
+        font-size: 1.06rem;
         font-weight: 800;
         color: #0f172a;
         border-left: 3px solid #b3904a;
@@ -1488,198 +1488,201 @@ if uploaded_file is not None:
         except Exception as _rp_pre_err:
             st.warning(f"⚠️ リスクパリティ事前計算に失敗しました: {_rp_pre_err}")
 
-    # ─── レポートデータ事前計算 ＋ 統合レポートパネル ────────────
-    # （build_report_data / render_report_panel は portfolio_report で管理）
-    _report_ctx = build_report_data(
-        portfolios=portfolios,
-        selected_funds=selected_funds,
-        core_fund=core_fund,
-        core_idx=core_idx,
-        fund_stats=fund_stats,
-        returns_selected=returns_selected,
-        rf_rate=rf_rate,
-        show_diagnosis=st.session_state.get("show_diagnosis", False),
-        show_rp=_show_rp,
-        rp_result=_rp_result,
-        tr_portfolio=_tr_portfolio,
-    )
-    # comparison_df / _comparison_col_cfg を ctx から取り出す
-    comparison_df         = _report_ctx["comparison_df"]
+    # ─── レポート全体を80%幅コンテナで表示（レイアウト側でサイズ制御）────
+    _rpt_left, _rpt_main, _rpt_right = st.columns([1, 8, 1])
+    with _rpt_main:
+        # ─── レポートデータ事前計算 ＋ 統合レポートパネル ────────────
+        # （build_report_data / render_report_panel は portfolio_report で管理）
+        _report_ctx = build_report_data(
+            portfolios=portfolios,
+            selected_funds=selected_funds,
+            core_fund=core_fund,
+            core_idx=core_idx,
+            fund_stats=fund_stats,
+            returns_selected=returns_selected,
+            rf_rate=rf_rate,
+            show_diagnosis=st.session_state.get("show_diagnosis", False),
+            show_rp=_show_rp,
+            rp_result=_rp_result,
+            tr_portfolio=_tr_portfolio,
+        )
+        # comparison_df / _comparison_col_cfg を ctx から取り出す
+        comparison_df         = _report_ctx["comparison_df"]
 
-    # render_report_panel は (allocation_df_numeric, period_start, period_end, period_months) を返す
-    allocation_df_numeric, _period_start, _period_end, _period_months = render_report_panel(
-        ctx=_report_ctx,
-        portfolios=portfolios,
-        selected_funds=selected_funds,
-        core_fund=core_fund,
-        core_idx=core_idx,
-        fund_stats=fund_stats,
-        returns_selected=returns_selected,
-        rf_rate=rf_rate,
-        show_rp=_show_rp,
-        overview_raw=overview_raw,
-        use_lw=_use_lw,
-        rp_result=_rp_result,
-        tr_portfolio=_tr_portfolio,
-    )
+        # render_report_panel は (allocation_df_numeric, period_start, period_end, period_months) を返す
+        allocation_df_numeric, _period_start, _period_end, _period_months = render_report_panel(
+            ctx=_report_ctx,
+            portfolios=portfolios,
+            selected_funds=selected_funds,
+            core_fund=core_fund,
+            core_idx=core_idx,
+            fund_stats=fund_stats,
+            returns_selected=returns_selected,
+            rf_rate=rf_rate,
+            show_rp=_show_rp,
+            overview_raw=overview_raw,
+            use_lw=_use_lw,
+            rp_result=_rp_result,
+            tr_portfolio=_tr_portfolio,
+        )
 
-    # 詳細分析セクション（外側：プロファイルタブ）
-    st.markdown('<div class="section-header">🔍 プロファイル別 詳細分析</div>', unsafe_allow_html=True)
+        # 詳細分析セクション（外側：プロファイルタブ）
+        st.markdown('<div class="section-header">🔍 プロファイル別 詳細分析</div>', unsafe_allow_html=True)
 
-    # 標準5プロファイルのみを外側タブの基本セットとする
-    # テールリスク最小型は portfolios dict に含まれているが、
-    # チェックOFF時は外側タブに表示しない（比較サマリーにも出さない）
-    _standard_5 = ["積極型", "やや積極型", "バランス型", "やや保守型", "保守型"]
-    available_profiles = [p for p in _standard_5 if p in portfolios]
+        # 標準5プロファイルのみを外側タブの基本セットとする
+        # テールリスク最小型は portfolios dict に含まれているが、
+        # チェックOFF時は外側タブに表示しない（比較サマリーにも出さない）
+        _standard_5 = ["積極型", "やや積極型", "バランス型", "やや保守型", "保守型"]
+        available_profiles = [p for p in _standard_5 if p in portfolios]
 
-    # チェックON時: リスクパリティ & テールリスク最小型タブを追加
-    # RP は portfolios dict には入っていないので、擬似的な dict エントリを用意する
-    _extra_profiles = []  # (profile_name, weights, stats) のリスト
-    if _show_rp:
-        if _rp_result is not None:
-            _rp_w, _rp_st, _ = _rp_result
-            _extra_profiles.append(("リスクパリティ", _rp_w, _rp_st))
-        if _tr_portfolio is not None:
-            _extra_profiles.append(("テールリスク最小型", _tr_portfolio["weights"], _tr_portfolio["stats"]))
+        # チェックON時: リスクパリティ & テールリスク最小型タブを追加
+        # RP は portfolios dict には入っていないので、擬似的な dict エントリを用意する
+        _extra_profiles = []  # (profile_name, weights, stats) のリスト
+        if _show_rp:
+            if _rp_result is not None:
+                _rp_w, _rp_st, _ = _rp_result
+                _extra_profiles.append(("リスクパリティ", _rp_w, _rp_st))
+            if _tr_portfolio is not None:
+                _extra_profiles.append(("テールリスク最小型", _tr_portfolio["weights"], _tr_portfolio["stats"]))
 
-    if not available_profiles and not _extra_profiles:
-        st.error("ポートフォリオの生成に失敗しました。パラメータを調整してください。")
-        st.stop()
+        if not available_profiles and not _extra_profiles:
+            st.error("ポートフォリオの生成に失敗しました。パラメータを調整してください。")
+            st.stop()
 
-    _profile_label = {
-        "積極型":         "🔴 積極型",
-        "やや積極型":     "🟠 やや積極型",
-        "バランス型":     "🟡 バランス型",
-        "やや保守型":     "🟢 やや保守型",
-        "保守型":         "🔵 保守型",
-        "リスクパリティ": "⚖️ リスクパリティ",
-        "テールリスク最小型": "🛡 テールリスク最小型",
-    }
+        _profile_label = {
+            "積極型":         "🔴 積極型",
+            "やや積極型":     "🟠 やや積極型",
+            "バランス型":     "🟡 バランス型",
+            "やや保守型":     "🟢 やや保守型",
+            "保守型":         "🔵 保守型",
+            "リスクパリティ": "⚖️ リスクパリティ",
+            "テールリスク最小型": "🛡 テールリスク最小型",
+        }
 
-    # 全タブ名一覧（標準5 + 追加分）
-    _all_tab_profiles   = available_profiles + [ep[0] for ep in _extra_profiles]
-    _outer_tabs = st.tabs([_profile_label.get(p, p) for p in _all_tab_profiles])
+        # 全タブ名一覧（標準5 + 追加分）
+        _all_tab_profiles   = available_profiles + [ep[0] for ep in _extra_profiles]
+        _outer_tabs = st.tabs([_profile_label.get(p, p) for p in _all_tab_profiles])
 
-    # 標準5プロファイルのタブ描画
-    for _outer_tab, _profile_name in zip(_outer_tabs[:len(available_profiles)], available_profiles):
-        with _outer_tab:
-            try:
-                _w = portfolios[_profile_name]["weights"]
-                _s = portfolios[_profile_name]["stats"]
-                if not isinstance(_w, np.ndarray):
-                    _w = np.array(_w)
-                if _w.shape[0] != len(selected_funds):
-                    st.error(f"ポートフォリオの次元が不正: {_w.shape[0]} != {len(selected_funds)}")
-                    continue
-                render_profile_detail(
-                    _profile_name, _w, _s,
-                    returns_selected=returns_selected,
-                    selected_funds=selected_funds,
-                    df_filtered=df_filtered,
-                    df_price=df_price,
-                    benchmark=benchmark,
-                    core_fund=core_fund,
-                    core_idx=core_idx,
-                    fund_stats=fund_stats,
-                    df_returns=df_returns,
-                    portfolios=portfolios,
-                    period_start=_period_start,
-                    period_end=_period_end,
-                    period_months=_period_months,
-                    rf_rate=rf_rate,
+        # 標準5プロファイルのタブ描画
+        for _outer_tab, _profile_name in zip(_outer_tabs[:len(available_profiles)], available_profiles):
+            with _outer_tab:
+                try:
+                    _w = portfolios[_profile_name]["weights"]
+                    _s = portfolios[_profile_name]["stats"]
+                    if not isinstance(_w, np.ndarray):
+                        _w = np.array(_w)
+                    if _w.shape[0] != len(selected_funds):
+                        st.error(f"ポートフォリオの次元が不正: {_w.shape[0]} != {len(selected_funds)}")
+                        continue
+                    render_profile_detail(
+                        _profile_name, _w, _s,
+                        returns_selected=returns_selected,
+                        selected_funds=selected_funds,
+                        df_filtered=df_filtered,
+                        df_price=df_price,
+                        benchmark=benchmark,
+                        core_fund=core_fund,
+                        core_idx=core_idx,
+                        fund_stats=fund_stats,
+                        df_returns=df_returns,
+                        portfolios=portfolios,
+                        period_start=_period_start,
+                        period_end=_period_end,
+                        period_months=_period_months,
+                        rf_rate=rf_rate,
+                    )
+                except Exception as _e:
+                    st.error(f"ポートフォリオデータの取得に失敗: {_e}")
+
+                # ── 📊 構成ファンド 個別分析（このプロファイルタブに連動）──
+                # render_profile_detail の直後・同一タブ内に配置することで、
+                # 外側タブ切替と構成ファンド表示を完全に連動させる。
+                # Streamlit タブには選択コールバックがないため、
+                # タブの外に1回だけ呼ぶ方式では連動できない。
+                render_fund_drill_section(
+                    portfolios       = portfolios,
+                    selected_funds   = selected_funds,
+                    returns_selected = returns_selected,
+                    core_fund        = core_fund,
+                    core_idx         = core_idx,
+                    df_filtered      = df_filtered,
+                    fund_stats       = fund_stats,
+                    period_start     = _period_start,
+                    period_end       = _period_end,
+                    period_months    = _period_months,
+                    profile_name     = _profile_name,   # タブ名を直接指定
+                    rf_rate          = rf_rate,          # [BUG-5修正] 無リスク金利を伝播
                 )
-            except Exception as _e:
-                st.error(f"ポートフォリオデータの取得に失敗: {_e}")
 
-            # ── 📊 構成ファンド 個別分析（このプロファイルタブに連動）──
-            # render_profile_detail の直後・同一タブ内に配置することで、
-            # 外側タブ切替と構成ファンド表示を完全に連動させる。
-            # Streamlit タブには選択コールバックがないため、
-            # タブの外に1回だけ呼ぶ方式では連動できない。
-            render_fund_drill_section(
-                portfolios       = portfolios,
-                selected_funds   = selected_funds,
-                returns_selected = returns_selected,
-                core_fund        = core_fund,
-                core_idx         = core_idx,
-                df_filtered      = df_filtered,
-                fund_stats       = fund_stats,
-                period_start     = _period_start,
-                period_end       = _period_end,
-                period_months    = _period_months,
-                profile_name     = _profile_name,   # タブ名を直接指定
-                rf_rate          = rf_rate,          # [BUG-5修正] 無リスク金利を伝播
-            )
+        # リスクパリティ & テールリスク最小型のタブ描画（チェックON時のみ）
+        for _outer_tab, (_ep_name, _ep_w, _ep_st) in zip(
+            _outer_tabs[len(available_profiles):], _extra_profiles
+        ):
+            with _outer_tab:
+                try:
+                    if not isinstance(_ep_w, np.ndarray):
+                        _ep_w = np.array(_ep_w)
+                    if _ep_w.shape[0] != len(selected_funds):
+                        st.error(f"ポートフォリオの次元が不正: {_ep_w.shape[0]} != {len(selected_funds)}")
+                        continue
+                    # portfolios dict に擬似エントリを追加して render_profile_detail に渡す
+                    _ep_portfolios_ext = dict(portfolios)
+                    _ep_cfg = {
+                        "core_range": (0.50, 0.65) if _ep_name == "リスクパリティ" else (0.70, 0.85),
+                        "max_individual": 0.20,
+                        "objective": "risk_parity" if _ep_name == "リスクパリティ" else "min_cvar",
+                        "color": "#6366f1" if _ep_name == "リスクパリティ" else "#553c9a",
+                    }
+                    _ep_portfolios_ext[_ep_name] = {
+                        "weights": _ep_w,
+                        "stats":   _ep_st,
+                        "config":  _ep_cfg,
+                    }
+                    render_profile_detail(
+                        _ep_name, _ep_w, _ep_st,
+                        returns_selected=returns_selected,
+                        selected_funds=selected_funds,
+                        df_filtered=df_filtered,
+                        df_price=df_price,
+                        benchmark=benchmark,
+                        core_fund=core_fund,
+                        core_idx=core_idx,
+                        fund_stats=fund_stats,
+                        df_returns=df_returns,
+                        portfolios=_ep_portfolios_ext,
+                        period_start=_period_start,
+                        period_end=_period_end,
+                        period_months=_period_months,
+                        rf_rate=rf_rate,
+                    )
+                except Exception as _e:
+                    st.error(f"{_ep_name}の詳細分析に失敗: {_e}")
 
-    # リスクパリティ & テールリスク最小型のタブ描画（チェックON時のみ）
-    for _outer_tab, (_ep_name, _ep_w, _ep_st) in zip(
-        _outer_tabs[len(available_profiles):], _extra_profiles
-    ):
-        with _outer_tab:
-            try:
-                if not isinstance(_ep_w, np.ndarray):
-                    _ep_w = np.array(_ep_w)
-                if _ep_w.shape[0] != len(selected_funds):
-                    st.error(f"ポートフォリオの次元が不正: {_ep_w.shape[0]} != {len(selected_funds)}")
-                    continue
-                # portfolios dict に擬似エントリを追加して render_profile_detail に渡す
-                _ep_portfolios_ext = dict(portfolios)
-                _ep_cfg = {
-                    "core_range": (0.50, 0.65) if _ep_name == "リスクパリティ" else (0.70, 0.85),
-                    "max_individual": 0.20,
-                    "objective": "risk_parity" if _ep_name == "リスクパリティ" else "min_cvar",
-                    "color": "#6366f1" if _ep_name == "リスクパリティ" else "#553c9a",
-                }
-                _ep_portfolios_ext[_ep_name] = {
-                    "weights": _ep_w,
-                    "stats":   _ep_st,
-                    "config":  _ep_cfg,
-                }
-                render_profile_detail(
-                    _ep_name, _ep_w, _ep_st,
-                    returns_selected=returns_selected,
-                    selected_funds=selected_funds,
-                    df_filtered=df_filtered,
-                    df_price=df_price,
-                    benchmark=benchmark,
-                    core_fund=core_fund,
-                    core_idx=core_idx,
-                    fund_stats=fund_stats,
-                    df_returns=df_returns,
-                    portfolios=_ep_portfolios_ext,
-                    period_start=_period_start,
-                    period_end=_period_end,
-                    period_months=_period_months,
-                    rf_rate=rf_rate,
-                )
-            except Exception as _e:
-                st.error(f"{_ep_name}の詳細分析に失敗: {_e}")
+        # ─── エクスポート機能 ─────────────────────────────────────────
+        # （render_export_section は portfolio_report で管理）
+        render_export_section(
+            portfolios=portfolios,
+            selected_funds=selected_funds,
+            comparison_df=comparison_df,
+            allocation_df_numeric=allocation_df_numeric,
+            fund_stats=fund_stats,
+            period_months=months,
+        )
 
-    # ─── エクスポート機能 ─────────────────────────────────────────
-    # （render_export_section は portfolio_report で管理）
-    render_export_section(
-        portfolios=portfolios,
-        selected_funds=selected_funds,
-        comparison_df=comparison_df,
-        allocation_df_numeric=allocation_df_numeric,
-        fund_stats=fund_stats,
-        period_months=months,
-    )
-
-    # ─── 免責事項 ─────────────────────────────────────────────
-    st.markdown(
-        '<div class="disclaimer">'
-        '【留意事項】本資料は情報提供を目的として作成したものであり、特定の投資信託の購入・売却を勧誘するものではありません。'
-        '本資料に掲載されているリターン・リスク指標はすべて過去の実績値であり、将来の運用成果を保証・約束するものでは一切ありません。'
-        '記載の数値は手数料・税金を考慮していない場合があります。'
-        '過去の運用実績は将来の成果を保証するものではありません。'
-        '投資信託は値動きのある有価証券等に投資しますので、基準価格が変動し、投資元本を割り込むことがあります。'
-        '外国籍ファンドへの投資は、為替リスク・カントリーリスク・流動性リスク等を含む各種リスクを伴います。'
-        '最大ドローダウンは過去の損失最大値であり、今後さらに大きな損失が生じる可能性を否定するものではありません。'
-        '　ヘッジファンドダイレクト株式会社　関東財務局長（金商）第532号'
-        '</div>',
-        unsafe_allow_html=True
-    )
+        # ─── 免責事項 ─────────────────────────────────────────────
+        st.markdown(
+            '<div class="disclaimer">'
+            '【留意事項】本資料は情報提供を目的として作成したものであり、特定の投資信託の購入・売却を勧誘するものではありません。'
+            '本資料に掲載されているリターン・リスク指標はすべて過去の実績値であり、将来の運用成果を保証・約束するものでは一切ありません。'
+            '記載の数値は手数料・税金を考慮していない場合があります。'
+            '過去の運用実績は将来の成果を保証するものではありません。'
+            '投資信託は値動きのある有価証券等に投資しますので、基準価格が変動し、投資元本を割り込むことがあります。'
+            '外国籍ファンドへの投資は、為替リスク・カントリーリスク・流動性リスク等を含む各種リスクを伴います。'
+            '最大ドローダウンは過去の損失最大値であり、今後さらに大きな損失が生じる可能性を否定するものではありません。'
+            '　ヘッジファンドダイレクト株式会社　関東財務局長（金商）第532号'
+            '</div>',
+            unsafe_allow_html=True
+        )
 
 else:
     st.markdown("""
