@@ -213,6 +213,11 @@ def test_improvements(returns, core_fund, selected_funds):
     # ── A3: 統計キャッシュ ────────────────────────────────────────────────
     print("\n[A3] 統計キャッシュ")
     try:
+        # [BUG-1修正] テスト2（test_screening）が同一引数で FundScreener を生成済みのため、
+        # クラスレベルキャッシュには既にエントリが存在する。
+        # 「ミス→ヒット」遷移を正確に検証するためにリセットする。
+        FundScreener._statistics_cache.clear()
+
         # 1回目: キャッシュミス（新規計算）
         sc1 = FundScreener(returns, risk_free_rate=0.005)
         hit1 = getattr(sc1, '_stats_cache_hit', None)
