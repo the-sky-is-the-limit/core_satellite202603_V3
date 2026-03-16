@@ -657,28 +657,14 @@ def _render_tab_risk(
         st.metric("月次勝率", f"{selected_stats['月次勝率']*100:.1f}%")
 
     # ── [改善G・H] 新指標行 ─────────────────────────────────────
-    # ポートフォリオレベルでOmega・Ulcer・Martin・GLを計算して表示
-    _pr = pd.Series(port_returns)
-    _tau = 0.0
-    _pos = np.maximum(_pr - _tau, 0).sum()
-    _neg = np.maximum(_tau - _pr, 0).sum()
-    _omega_port = min(_pos / _neg, 99.99) if _neg > 1e-8 else (99.99 if _pos > 0 else 0.0)
-
-    _dd_sq   = drawdown ** 2
-    _ulcer_port = float(np.sqrt(np.mean(_dd_sq)))
-    _ann_ret_geom = selected_stats['年率リターン']
-    _martin_port  = (_ann_ret_geom / _ulcer_port) if _ulcer_port > 1e-8 else (
-        99.99 if _ann_ret_geom > 0 else 0.0
-    )
-    _martin_port = min(max(_martin_port, -99.99), 99.99)
-
-    _wins   = _pr[_pr > 0]
-    _losses = _pr[_pr < 0]
-    _ag = _wins.mean()        if len(_wins)   > 0 else 0.0
-    _al = abs(_losses.mean()) if len(_losses) > 0 else 1e-8
-    _gl_port = min(_ag / _al, 99.99) if _al > 1e-8 and _ag > 0 else (
-        99.99 if _ag > 0 else 0.0
-    )
+    # [ISSUE-5修正] portfolio_utils.calculate_portfolio_stats() が既に計算済みの値を
+    # selected_stats から直接参照する。
+    # 旧実装は port_returns から独立して再計算しており、portfolio_utils 側の計算式変更に
+    # 自動追従できない保守リスクがあった。
+    _omega_port  = selected_stats.get('Omega比率',  0.0)
+    _ulcer_port  = selected_stats.get('Ulcer指数',  0.0)
+    _martin_port = selected_stats.get('Martin比率', 0.0)
+    _gl_port     = selected_stats.get('GL比率',     0.0)
 
     col5, col6, col7, col8 = st.columns(4)
     with col5:
@@ -938,6 +924,9 @@ def _render_tab_constituents(
             return np.nan
         period_returns = returns_series.iloc[-periods:]
         cum_return = (1 + period_returns).prod() - 1
+        # [BUG-6修正] 1+cum_return ≤ 0（全損）は CAGR 未定義（複素数になる）
+        if (1 + cum_return) <= 0:
+            return np.nan
         annual_return = (1 + cum_return) ** (12 / periods) - 1
         return annual_return * 100
 
@@ -1217,6 +1206,7 @@ def _render_fund_client_view(
     df_filtered,
     period_start, period_end, period_months,
     profile_color,
+    rf_rate: float = 0.0,   # [BUG-5修正] サイドバー設定の無リスク金利を受け取る
 ):
     """構成ファンド個別の顧客向けリッチHTML表示。
 
@@ -1249,12 +1239,17 @@ def _render_fund_client_view(
 
     _total_ret   = (_fund_cum_s.iloc[-1] - 1) * 100
     _years       = _n / 12
-    _ann_ret     = ((1 + _total_ret / 100) ** (1 / _years) - 1) * 100 if _years > 0 else 0.0
+    # [BUG-7修正] 1 + _total_ret/100 ≤ 0（全損）は CAGR 未定義 → 0.0 で補完
+    _base_cagr   = 1 + _total_ret / 100
+    _ann_ret     = ((_base_cagr ** (1 / _years) - 1) * 100 if (_years > 0 and _base_cagr > 0) else 0.0)
     _vol         = float(_fund_ret_s.std(ddof=1)) * (12 ** 0.5) * 100
 
-    _rf_monthly  = 0.0   # 個別ファンド表示では簡易計算（無リスク金利なし）
-    _excess      = _fund_ret_s - _rf_monthly
-    _sharpe      = (_excess.mean() / _fund_ret_s.std(ddof=1) * (12 ** 0.5)) if _fund_ret_s.std(ddof=1) > 1e-8 else 0.0
+    _rf_monthly  = rf_rate / 12   # [BUG-5修正] サイドバー設定の rf_rate を反映
+    # シャープレシオ（算術平均ベース・portfolio_utils と統一）
+    _annual_arith = _fund_ret_s.mean() * 12
+    _annual_excess_arith = _annual_arith - rf_rate
+    _sharpe      = (_annual_excess_arith / (_fund_ret_s.std(ddof=1) * (12 ** 0.5))
+                    if _fund_ret_s.std(ddof=1) > 1e-8 else 0.0)
 
     # MDD（先頭1.0付加）
     _cum_padded  = np.concatenate([[1.0], _fund_cum_s.values])
@@ -1262,10 +1257,15 @@ def _render_fund_client_view(
     _dd_series   = (_cum_padded - _running_max) / _running_max
     _mdd         = float(_dd_series[1:].min()) * 100   # 先頭除去後
 
-    # ソルティノ
-    _down        = _fund_ret_s[_fund_ret_s < 0]
-    _semi_dev    = float(np.sqrt(np.mean(_down.values ** 2)) * (12 ** 0.5)) if len(_down) > 0 else 1e-8
-    _sortino     = min((_ann_ret / 100) / _semi_dev if _semi_dev > 1e-8 else 0.0, 10.0)
+    # ソルティノレシオ（Sortino & van der Meer 1991 定義・portfolio_utils と統一）
+    # [BUG-4修正] 旧実装は「負の月だけの二乗平均」を分母にしていた。
+    # 正しくは全T期間で min(r-τ, 0)² を平均し発生頻度ペナルティを反映する。
+    # 分子も算術平均ベースの超過リターンに統一（旧実装はCAGRベース）。
+    _tau_monthly = rf_rate / 12
+    _annual_excess_sort = _annual_arith - rf_rate   # 算術平均ベース超過リターン
+    _ds_sq    = np.minimum(_fund_ret_s.values - _tau_monthly, 0) ** 2
+    _semi_dev = float(np.sqrt(_ds_sq.mean()) * np.sqrt(12))
+    _sortino  = min(_annual_excess_sort / _semi_dev if _semi_dev > 1e-8 else 0.0, 10.0)
 
     # VaR / CVaR (95%, 月次)
     _k           = max(1, int(np.floor(_n * 0.05)))
@@ -1326,7 +1326,7 @@ def _render_fund_client_view(
 
     # ── Canvas UID（ファンド名ハッシュで衝突回避） ────────────────
     import hashlib as _hl
-    _uid = _hl.md5(fund_name.encode()).hexdigest()[:8]
+    _uid = _hl.md5(fund_name.encode(), usedforsecurity=False).hexdigest()[:8]  # [ISSUE-4修正]
 
     # ── HTML生成 ─────────────────────────────────────────────────
     _html = f"""<!DOCTYPE html>
@@ -1595,6 +1595,7 @@ def render_fund_drill_section(
     period_end,
     period_months,
     profile_name: str = None,
+    rf_rate: float = 0.0,   # [BUG-5修正] シャープ・ソルティノ計算用
 ):
     """📊 構成ファンド 個別分析セクション。
 
@@ -1678,6 +1679,7 @@ def render_fund_drill_section(
                 period_end        = period_end,
                 period_months     = period_months,
                 profile_color     = _color,
+                rf_rate           = rf_rate,   # [BUG-5修正] 伝播
             )
 
 
