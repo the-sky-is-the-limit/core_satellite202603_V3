@@ -846,6 +846,10 @@ def _render_tab_montecarlo(
             # 正規分布 N(log_mu, port_std_monthly) でログリターンを生成
             # → exp(累積和) で対数正規過程を正確に模擬
             # default_rng でグローバル乱数状態を汚染しない
+            # [NEW-ISSUE-2設計注記] seed=42 に固定しているため、同一パラメータでの
+            # 実行は毎回同一の結果を返す。これはパーセンタイル帯の収束確認や
+            # 再現性のあるレポート出力には適切だが、「毎回異なるシナリオを
+            # 試したい」用途には向かない。変更する場合は seed=None に設定すること。
             rng = np.random.default_rng(42)
             log_returns = rng.normal(log_mu, port_std_monthly, (n_simulations, n_periods))
             simulations = np.ones((n_simulations, n_periods + 1))
@@ -1289,7 +1293,11 @@ def _render_fund_client_view(
         .corr(_fund_ret_s)
         .dropna()
     )
-    _roll_corr_stability = float(_roll_corr.std(ddof=1)) if len(_roll_corr) >= 3 else float("nan")
+    # [NEW-BUG-2修正] ddof=1 → ddof=0 に変更。
+    # FundScreener.calculate_correlations() および
+    # portfolio_data.compute_fund_overview_table() は ddof=0 を使用しており、
+    # 顧客向け表示の相関安定性(σ) が他画面と約4%高く表示されていた。
+    _roll_corr_stability = float(_roll_corr.std(ddof=0)) if len(_roll_corr) >= 3 else float("nan")
 
     # 年次リターン
     _fund_ret_annual = (
