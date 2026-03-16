@@ -883,9 +883,9 @@ if uploaded_file is not None:
                 unsafe_allow_html=True
             )
             bq_neg    = st.slider("マイナス相関（ヘッジ役）",    0, 6, 2, 1)
-            bq_low    = st.slider("低相関 0〜0.25（分散役）",   0, 6, 3, 1)
-            bq_midlo  = st.slider("中低相関 0.25〜0.5（バランス役）", 0, 8, 5, 1)
-            bq_midhi  = st.slider("中高相関 0.5〜0.75（収益補完役）", 0, 8, 5, 1)
+            bq_low    = st.slider("低相関 0〜0.25（分散役）",   0, 6, 5, 1)
+            bq_midlo  = st.slider("中低相関 0.25〜0.5（バランス役）", 0, 8, 6, 1)
+            bq_midhi  = st.slider("中高相関 0.5〜0.75（収益補完役）", 0, 8, 6, 1)
             bq_high   = st.slider("高相関 0.75〜1.0（リターン牽引役）", 0, 6, 4, 1)
             bucket_quota_param = {
                 'マイナス相関': bq_neg,
