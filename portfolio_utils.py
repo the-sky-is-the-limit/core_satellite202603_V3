@@ -1947,25 +1947,27 @@ def calculate_fund_metrics(
     max_dd   = float(_dd_arr[1:].min()) * 100  # 表示用 % スケール
 
     # ── Omega 比率 ────────────────────────────────────────────
+    # [NEW-BUG-1修正] クリップ上限を 99.99 → 999.99 に変更。
+    # calculate_portfolio_stats / FundScreener._calculate_statistics と統一。
     tau   = 0.0
     pos   = np.maximum(returns_series - tau, 0).sum()
     neg   = np.maximum(tau - returns_series, 0).sum()
-    omega = min(pos / neg, 99.99) if neg > 1e-8 else (99.99 if pos > 0 else 0.0)
+    omega = min(pos / neg, 999.99) if neg > 1e-8 else (999.99 if pos > 0 else 0.0)
 
     # ── Ulcer 指数・Martin 比率 ───────────────────────────────
     ulcer  = float(np.sqrt(np.mean(drawdown ** 2)))
     martin = (annual_return_geom / ulcer) if ulcer > 1e-8 else (
-        99.99 if annual_return_geom > 0 else 0.0
+        999.99 if annual_return_geom > 0 else 0.0
     )
-    martin = min(max(martin, -99.99), 99.99)
+    martin = min(max(martin, -999.99), 999.99)
 
     # ── GL 比率（Gain/Loss 比率）─────────────────────────────
     wins     = returns_series[returns_series > 0]
     losses   = returns_series[returns_series < 0]
     avg_gain = wins.mean()        if len(wins)   > 0 else 0.0
     avg_loss = abs(losses.mean()) if len(losses) > 0 else 1e-8
-    gl_ratio = min(avg_gain / avg_loss, 99.99) if avg_loss > 1e-8 and avg_gain > 0 else (
-        99.99 if avg_gain > 0 else 0.0
+    gl_ratio = min(avg_gain / avg_loss, 999.99) if avg_loss > 1e-8 and avg_gain > 0 else (
+        999.99 if avg_gain > 0 else 0.0
     )
 
     # ── ベンチマーク相関 ──────────────────────────────────────
