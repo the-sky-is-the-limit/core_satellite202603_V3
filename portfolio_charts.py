@@ -37,7 +37,7 @@ from portfolio_utils import calculate_fund_metrics
 # M-3: _donut_svg → donut_svg に昇格（portfolio_report.py からの import に備え公開 API 化）
 #      旧名は後方互換エイリアスとして残す。
 def donut_svg(pct_val, color, size=72):
-    r = 26; cx = cy = 36; circ = 2 * math.pi * r
+    r = 26; circ = 2 * math.pi * r
     arc = (pct_val / 100) * circ
     offset = circ / 4
     return (
@@ -1228,7 +1228,6 @@ def _render_fund_client_view(
     import streamlit.components.v1 as _components
 
     _c = profile_color  # プロファイルアクセントカラー
-    _c_bg = _c + "1a"   # 透明度10% fallback（cssで指定するので使わない）
 
     # ── ファンドリターン系列 ──────────────────────────────────────
     _fund_ret_s  = returns_selected[fund_name].dropna()
