@@ -1,8 +1,14 @@
 """
-portfolio_data.py  v1.0.0
+portfolio_data.py  v1.1.0
 ==========================
 データ読込・概観テーブル計算・表示整形モジュール。
 portfolio_app.py から import して使用する。
+
+修正（v1.1.0 — コードレビュー修正 2026-03）:
+✅ [FIX-NAN] cagr() の戻り値を None → np.nan に統一
+   - 旧実装は None を返していたため、pandas の数値列が object dtype に昇格し、
+     prep_overview_df の ×100 処理や st.dataframe のソートが暗黙的に失敗するリスクがあった。
+   - np.nan に統一することで dtype=float が維持され、数値演算が安全に機能する。
 
 新規作成経緯（ステージ2リファクタ 2026-03）:
   portfolio_app.py の if uploaded_file ブロック内に定義されていた
@@ -144,15 +150,21 @@ def compute_fund_overview_table(
     core_ret_period = core_px_period.pct_change(fill_method=None).dropna()
 
     def cagr(ret_series: pd.Series, months: int):
-        """指定月数の年率 CAGR。データ不足・全損は None を返す。"""
+        """指定月数の年率 CAGR。データ不足・全損は np.nan を返す。
+
+        [FIX-NAN] 旧実装は None を返していたが、pandas の数値列に None が混在すると
+        object dtype に昇格して ×100 / ソート等の数値演算が暗黙的に失敗するリスクがある。
+        np.nan に統一することで dtype=float が維持され、
+        prep_overview_df の ×100 処理・st.dataframe のソートが確実に機能する。
+        """
         if len(ret_series) < months:
-            return None
+            return np.nan
         r    = ret_series.iloc[-months:]
         cum  = (1 + r).prod() - 1
         base = 1 + cum
         # [BUG-2修正] base ≤ 0（累積損失 100% 超）は CAGR 未定義（複素数になる）
         if base <= 0:
-            return None
+            return np.nan
         return base ** (12.0 / months) - 1
 
     rows = []
