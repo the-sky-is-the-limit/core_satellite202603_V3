@@ -1,8 +1,17 @@
 """
-portfolio_report.py  v1.2.0
+portfolio_report.py  v1.3.0
 =============================
 統合レポートパネル・エクスポート機能モジュール。
 portfolio_app.py から import して使用する。
+
+修正（v1.3.0 — コードレビュー修正 2026-03）:
+✅ [FIX-CFG] compute_rp_portfolio のコア比率・個別上限をハードコードから引数化
+   - 旧実装: core_weight_range=(0.50, 0.65), max_individual=0.20 をリテラルで埋め込み。
+     portfolio_app.py の optimization_configs["バランス型"] が変更されても
+     compute_rp_portfolio だけ旧値を参照し続ける問題があった。
+   - 新実装: core_weight_range / max_individual / min_individual を引数として受け取る。
+     呼び出し元（portfolio_app.py）が optimization_configs から値を渡すことで一元管理。
+     後方互換のためデフォルト値は旧リテラル値と同一に設定。
 
 修正（v1.2.0 — 2026-03）:
   compute_rp_portfolio をモジュールレベルに昇格（importable化）。
@@ -41,11 +50,30 @@ _STANDARD_PROFILES = ["積極型", "やや積極型", "バランス型", "やや
 
 
 @st.cache_data(show_spinner=False)
-def compute_rp_portfolio(_rets, _funds_tuple, _core_name, _lw: bool, _rf: float, data_hash: str = ""):
+def compute_rp_portfolio(
+    _rets, _funds_tuple, _core_name, _lw: bool, _rf: float,
+    data_hash: str = "",
+    core_weight_range: tuple = (0.50, 0.65),
+    max_individual: float = 0.20,
+    min_individual: float = 0.03,
+):
     """リスクパリティポートフォリオを計算してキャッシュする。
 
-    コアウェイト制約（バランス型と同一：50〜65%）を維持したまま、
+    コアウェイト制約（デフォルトはバランス型と同一：50〜65%）を維持したまま、
     サテライト各ファンドのリスク寄与（Risk Contribution）を均等化した配分を算出。
+
+    Parameters
+    ----------
+    core_weight_range : tuple
+        コアファンドのウェイト範囲。デフォルト (0.50, 0.65)。
+        [FIX-CFG] 旧実装はリテラル (0.50, 0.65) をハードコードしていたため、
+        portfolio_app.py の optimization_configs["バランス型"]["core_range"] が
+        変更されても compute_rp_portfolio だけ古い値を参照し続ける問題があった。
+        引数化することで呼び出し側が optimization_configs から一元管理できる。
+    max_individual : float
+        個別ファンドの上限ウェイト。デフォルト 0.20。
+    min_individual : float
+        個別ファンドの下限ウェイト（自動調整の基準値）。デフォルト 0.03。
 
     Returns
     -------
@@ -59,9 +87,9 @@ def compute_rp_portfolio(_rets, _funds_tuple, _core_name, _lw: bool, _rf: float,
     # O-04 相当: 下限可行性チェック
     # コア最小値 + サテライト本数 × min_individual > 1.0 になると最適化が収束しない。
     # portfolio_app.py のO-04修正と同一ロジックでここでも自動調整する。
-    _core_lo    = 0.50
-    _max_ind    = 0.20
-    _min_ind    = 0.03
+    _core_lo    = core_weight_range[0]
+    _max_ind    = max_individual
+    _min_ind    = min_individual
     _n_sat      = max(len(_funds_tuple) - 1, 1)
     if _core_lo + _n_sat * _min_ind > 1.0 + 1e-6:
         _min_ind = max(0.0, (1.0 - _core_lo) / _n_sat - 1e-6)
@@ -75,7 +103,7 @@ def compute_rp_portfolio(_rets, _funds_tuple, _core_name, _lw: bool, _rf: float,
 
     _w   = _az.optimize_portfolio(
         _ci,
-        core_weight_range=(0.50, 0.65),   # バランス型と同一のコア範囲
+        core_weight_range=core_weight_range,
         objective_type="risk_parity",
         max_individual=_max_ind,
         min_individual=_min_ind,
