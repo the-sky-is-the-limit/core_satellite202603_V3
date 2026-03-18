@@ -1,5 +1,21 @@
 """
-ポートフォリオ最適化 - ユーティリティ関数（改善版 v3.4.1）
+ポートフォリオ最適化 - ユーティリティ関数（改善版 v3.4.2）
+
+改善内容（v3.4.2 — コードレビュー修正 2026-03）:
+
+✅ [FIX-RP] リスクパリティ目的関数のアクティブセット問題を修正
+   - 旧実装: 全サテライト（ほぼゼロウェイト含む）のリスク寄与を均等化しようとするため、
+     一次最適化（アクティブセット未確定）でゼロ付近の RC に引っ張られ収束が不安定だった。
+   - 新実装: min_individual × 0.5 の閾値（デフォルト 0.015）を設け、
+     それ以上のウェイトを持つアクティブサテライトのみ均等化対象とする。
+     アクティブが 1 本以下に縮退した場合はボラ最小化でフォールバック。
+   - 効果: 一次最適化の収束品質が改善。二次最適化（bounds=(0,0) 適用後）には影響なし。
+
+✅ [FIX-CAL] カルマー比率の負値処理を修正（_calculate_statistics・calculate_portfolio_stats）
+   - 旧実装: CAGR < 0 のファンドをカルマー比率 0 に丸めていたため、
+     「データ不足でゼロ」と「リターンが負でゼロ」の区別がスクリーニングのランク正規化で消滅。
+   - 新実装: 負のカルマー比率をそのまま保持し、範囲を [-999.99, 999.99] に統一。
+     これによりランク正規化（パーセンタイル変換）が損失ファンドを正しく低評価できる。
 
 改善内容（v3.4.1 — コードレビュー修正 2026-03）:
 ✅ [BUG-1] FundScreener にクラスレベル統計キャッシュを実装
@@ -350,9 +366,14 @@ class PortfolioAnalyzer:
         max_dd = drawdown.min()
 
         # カルマー比率（CAGRベース）
-        calmar = port_return_geom / abs(max_dd) if abs(max_dd) > 0.0001 else np.inf
-        if calmar < 0:  # リターンが負の場合
-            calmar = 0
+        # [FIX-CAL] 負のカルマー比率（CAGR < 0）を表示用にも保持する。
+        #   旧実装は負を 0 に丸めていたため「損失中のポートフォリオ」と
+        #   「ドローダウンがゼロに近い均等配分」の区別が UI 上でできなかった。
+        #   表示値として負のカルマー比率は「リターンが負であること」を明示する。
+        #   上限 999.99 / 下限 -999.99 のみ設定する。
+        calmar = port_return_geom / abs(max_dd) if abs(max_dd) > 0.0001 else (
+            np.inf if port_return_geom > 0 else 0.0
+        )
 
         # VaR/CVaR (95%) - 月次のまま表示
         # np.percentile は補間値を返すため、実際の観測値に存在しない VaR になりうる。
@@ -393,7 +414,7 @@ class PortfolioAnalyzer:
             'シャープレシオ':    sharpe,
             'ソルティノレシオ':  min(sortino, 999.99),
             '最大ドローダウン':  max_dd,
-            'カルマー比率':      min(calmar, 999.99),
+            'カルマー比率':      max(min(calmar, 999.99), -999.99),
             '月次VaR_95':        var_95,
             '月次CVaR_95':       cvar_95,
             '月次勝率':          (port_returns > 0).sum() / len(port_returns),
@@ -875,16 +896,42 @@ class PortfolioAnalyzer:
                 return -(ret - 1.0 * vol)
 
         elif objective_type == 'risk_parity':
+            # [FIX-RP] アクティブセット未確定時（一次最適化）でも意味のある目的関数。
+            #
+            # 旧実装の問題:
+            #   全サテライト（ほぼゼロウェイトを含む）のリスク寄与を均等化しようとするため、
+            #   最適化のランドスケープが著しく歪む。例えばN=29本のサテライトのうち
+            #   真に保有すべき15本とほぼゼロの14本が混在する状態で均等化すると、
+            #   ゼロ付近のRC（≈ 0）に向けて全体が収束しようとする無意味な引力が発生する。
+            #
+            # 新実装の方針:
+            #   min_individual を参照した閾値（_rp_thresh）を下回るウェイトの
+            #   サテライトは均等化対象から除外する。
+            #   - _rp_thresh = min_individual × 0.5 = デフォルト0.015
+            #   - これにより「min_individual 未満 = 実質ゼロポジション」を正しく扱える
+            #   - アクティブファンドが1本以下に縮退する場合はボラ最小化で代替
+            #     （最適化が発散するのを防ぐフォールバック）
+            #
+            # 二次最適化（アクティブセット固定後）では bounds=(0,0) が適用済みのため
+            # 当閾値処理は実質的に不要になるが、一次最適化の収束品質改善に直接効く。
+            _rp_thresh = max(min_individual * 0.5, 1e-4)  # ゼロウェイト判定の閾値
+
             def objective(w):
                 port_vol = np.sqrt(np.dot(w, np.dot(cov_vals, w)))
                 if port_vol < 1e-8:
                     return 0.0
-                rc  = w * np.dot(cov_vals, w) / port_vol
+                rc = w * np.dot(cov_vals, w) / port_vol
                 non_core = np.arange(len(w)) != core_fund_idx
-                rc_sat   = rc[non_core]
-                n_sat    = max(rc_sat.size, 1)
-                target   = rc_sat.sum() / n_sat
-                return float(np.sum((rc_sat - target) ** 2))
+                w_sat  = w[non_core]
+                rc_sat = rc[non_core]
+                # 閾値以上のサテライトのみ均等化対象とする
+                active_mask = w_sat > _rp_thresh
+                if active_mask.sum() < 2:
+                    # アクティブが1本以下の縮退ケース → ボラ最小化で代替
+                    return float(port_vol)
+                rc_active = rc_sat[active_mask]
+                target    = rc_active.mean()
+                return float(np.sum((rc_active - target) ** 2))
 
         elif objective_type == 'min_cvar':
             # CVaR最小化（Conditional Value at Risk = 期待ショートフォール、95%水準）
@@ -1275,10 +1322,16 @@ class FundScreener:
             cagr_val = float(stats.loc[col, '年率リターン'])
             if abs(max_dd) > 0.0001:
                 calmar = cagr_val / abs(max_dd)
-                calmar = max(calmar, 0)          # リターン負の場合は0
+                # [FIX-CAL] max(calmar, 0) を廃止:
+                #   旧実装は CAGR < 0 のファンドをカルマー比率 0 に丸めていたため、
+                #   「データ不足でゼロ」と「リターンが負でゼロ」が区別できず
+                #   スクリーニングのランク正規化（パーセンタイル変換）が誤作動する。
+                #   負のカルマー比率をそのまま保持することで、
+                #   ランク正規化が「リターンが負のファンドを自然に低評価」できるようになる。
+                #   上限 999.99 のみ維持し、下限は -999.99 に揃える。
             else:
                 calmar = np.inf if cagr_val > 0 else 0.0
-            stats.loc[col, 'カルマー比率'] = min(calmar, 999.99)
+            stats.loc[col, 'カルマー比率'] = max(min(calmar, 999.99), -999.99)
 
             # ── Omega比率（利益合計 / 損失合計）─────────────────────────────
             if n_p > 0:
