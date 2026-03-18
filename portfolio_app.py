@@ -1474,12 +1474,18 @@ if uploaded_file is not None:
         _tr_portfolio = portfolios.get("テールリスク最小型", None)   # optimization_configs に常に含まれる
         if _show_rp:
             try:
-                # data_hash に LW設定・rf_rate も含めることで
+                # [FIX-CFG] core_weight_range / max_individual / min_individual を
+                # optimization_configs["バランス型"] から取得して渡す。
+                # 旧実装は compute_rp_portfolio 内でリテラル値をハードコードしていたため、
+                # サイドバー設定変更の影響が反映されなかった。
+                _rp_bal_cfg = optimization_configs.get("バランス型", {})
+                # data_hash に LW設定・rf_rate に加えてコア比率設定も含めることで
                 # これらの変更時にキャッシュが正しく無効化される。
-                # （_lw / _rf はアンダースコア引数のため st.cache_data がハッシュ化しない）
+                # （アンダースコア引数 _lw / _rf は st.cache_data がハッシュ化しないため別途渡す）
+                _rp_core_range_key = str(_rp_bal_cfg.get("core_range", (0.50, 0.65)))
                 _ret_hash = hashlib.sha256(
                     pd.util.hash_pandas_object(returns_selected, index=True).values.tobytes()
-                ).hexdigest()[:16] + f"|lw={_use_lw}|rf={rf_rate:.4f}"
+                ).hexdigest()[:16] + f"|lw={_use_lw}|rf={rf_rate:.4f}|cr={_rp_core_range_key}"
                 _rp_result = compute_rp_portfolio(
                     returns_selected,
                     tuple(selected_funds),
@@ -1487,6 +1493,9 @@ if uploaded_file is not None:
                     _use_lw,
                     rf_rate,
                     _ret_hash,
+                    core_weight_range=_rp_bal_cfg.get("core_range",     (0.50, 0.65)),
+                    max_individual   =_rp_bal_cfg.get("max_individual", 0.20),
+                    min_individual   =_rp_bal_cfg.get("min_individual", 0.03),
                 )
             except Exception as _rp_pre_err:
                 st.warning(f"⚠️ リスクパリティ事前計算に失敗しました: {_rp_pre_err}")
@@ -1627,9 +1636,19 @@ if uploaded_file is not None:
                         continue
                     # portfolios dict に擬似エントリを追加して render_profile_detail に渡す
                     _ep_portfolios_ext = dict(portfolios)
+                    # [FIX-CFG] コア比率・個別上限をハードコードせず optimization_configs から参照する。
+                    # 旧実装:
+                    #   core_range = (0.50, 0.65) or (0.70, 0.85) のリテラル値
+                    #   max_individual = 0.20 のリテラル値
+                    # → ユーザーがサイドバーで設定を変えても _ep_cfg だけ古い値を参照し続ける問題。
+                    # 新実装:
+                    #   リスクパリティ → バランス型の設定を参照（compute_rp_portfolio と同一前提）
+                    #   テールリスク最小型 → optimization_configs["テールリスク最小型"] を参照
+                    _ref_profile = "バランス型" if _ep_name == "リスクパリティ" else "テールリスク最小型"
+                    _ref_cfg     = optimization_configs.get(_ref_profile, {})
                     _ep_cfg = {
-                        "core_range": (0.50, 0.65) if _ep_name == "リスクパリティ" else (0.70, 0.85),
-                        "max_individual": 0.20,
+                        "core_range":     _ref_cfg.get("core_range",     (0.50, 0.65) if _ep_name == "リスクパリティ" else (0.70, 0.85)),
+                        "max_individual": _ref_cfg.get("max_individual", 0.20),
                         "objective": "risk_parity" if _ep_name == "リスクパリティ" else "min_cvar",
                         "color": "#6366f1" if _ep_name == "リスクパリティ" else "#553c9a",
                     }
