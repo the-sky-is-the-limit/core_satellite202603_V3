@@ -510,7 +510,6 @@ def render_report_panel(
                 f'    </div>'
                 f'    <div class="profile-card-row">'
                 f'      <span class="profile-card-row-label">シャープレシオ'
-                f'        <span class="profile-card-row-label-sub">リターン効率：<br>1.0超が目安</span>'
                 f'      </span>'
                 f'      <span class="profile-card-row-val" style="color:{sr_color};">{sr_:.2f}</span>'
                 f'    </div>'
@@ -618,7 +617,7 @@ def render_report_panel(
                     _rp_donut    = _donut_svg(_rp_core, "rgba(255,255,255,0.9)")
 
                     _rp_card_html = (
-                        f'<div class="profile-card" style="border-color:#6366f140;max-width:260px;">'
+                        f'<div class="profile-card" style="border-color:#6366f140;max-width:300px;">'
                         f'  <div class="profile-card-header" style="background:linear-gradient(135deg,#4338ca,#6366f1);">'
                         f'    <div class="profile-card-eyebrow">RISK PARITY</div>'
                         f'    <div class="profile-card-title">リスクパリティ</div>'
@@ -639,7 +638,6 @@ def render_report_panel(
                         f'    </div>'
                         f'    <div class="profile-card-row">'
                         f'      <span class="profile-card-row-label">シャープレシオ'
-                        f'        <span class="profile-card-row-label-sub">リターン効率：<br>1.0超が目安</span>'
                         f'      </span>'
                         f'      <span class="profile-card-row-val" style="color:{_rp_sr_color};">{_rp_sr:.2f}</span>'
                         f'    </div>'
@@ -688,7 +686,7 @@ def render_report_panel(
                     _tr_cvar_str = f"{_tr_cvar*100:.2f}%" if _tr_cvar is not None else "—"
 
                     _tr_card_html = (
-                        f'<div class="profile-card" style="border-color:#553c9a40;max-width:260px;">'
+                        f'<div class="profile-card" style="border-color:#553c9a40;max-width:300px;">'
                         f'  <div class="profile-card-header" style="background:linear-gradient(135deg,#44337a,#6b46c1);">'
                         f'    <div class="profile-card-eyebrow">TAIL-RISK MIN</div>'
                         f'    <div class="profile-card-title">テールリスク最小型</div>'
@@ -709,7 +707,6 @@ def render_report_panel(
                         f'    </div>'
                         f'    <div class="profile-card-row">'
                         f'      <span class="profile-card-row-label">シャープレシオ'
-                        f'        <span class="profile-card-row-label-sub">リターン効率：<br>1.0超が目安</span>'
                         f'      </span>'
                         f'      <span class="profile-card-row-val" style="color:{_tr_sr_color};">{_tr_sr:.2f}</span>'
                         f'    </div>'
