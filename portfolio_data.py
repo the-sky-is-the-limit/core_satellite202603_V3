@@ -289,7 +289,7 @@ def make_overview_col_config(columns) -> dict:
         "最大DD(設定来)":        "最大DD 設定来(%)",
     }
     pct_unsigned_label = {
-        "設定来ボラ": "設定来 ボラ(%)",
+        "設定来ボラ": "設定来 価格変動リスク(%)",
         "月次勝率":   "月次 勝率(%)",
     }
     cfg = {}
