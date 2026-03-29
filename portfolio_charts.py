@@ -131,11 +131,14 @@ def _render_client_view(
     _yearly_vals  = (_yearly.values * 100).tolist()
 
     # 構成ファンド
+    # [BUG-Ph5修正] > 0.005 → >= 0.005 に変更。
+    # v2.0.1 で _render_tab_constituents の同条件を >= に修正済みだが、
+    # 顧客向けビューにのみ適用漏れがあったため統一する。
     _holdings = [
         {"name": selected_funds[i].split(" ", 1)[1] if " " in selected_funds[i] else selected_funds[i],
          "code": selected_funds[i].split(" ")[0],
          "weight": round(selected_weights[i] * 100, 1)}
-        for i in range(len(selected_funds)) if selected_weights[i] > 0.005
+        for i in range(len(selected_funds)) if selected_weights[i] >= 0.005
     ]
     _holdings.sort(key=lambda x: x["weight"], reverse=True)
 
@@ -198,9 +201,14 @@ def _render_client_view(
     # データ行（コア先頭、残りは割合降順）
     _tbl_rows = ""
     for _h in _holdings:
+        # [FIX-MEDIUM-Ph5-3] startswith(_h["code"]) によるプレフィックス一致から
+        # split(" ")[0] == _h["code"] による完全一致検索に変更。
+        # 旧実装は "J01 Fund A" と "J010 Fund B" のように一方が他方のプレフィックスになる
+        # ファンドコードが存在する場合に誤マッチが生じるリスクがあった。
+        # split で空白前の部分（コード）を完全一致で比較することで安全に特定できる。
         _fname = selected_funds[next(
             i for i, f in enumerate(selected_funds)
-            if f.startswith(_h["code"])
+            if f.split(" ")[0] == _h["code"]
         )]
         _is_core = (_fname == core_fund)
         _row_bg  = '#dbeafe' if _is_core else '#ffffff'
@@ -684,16 +692,24 @@ def _render_tab_performance(
 
                     # チャート作成
                     fig_fund = go.Figure()
+                    # [BUG-Ph5修正] hex カラーパース（color[1:3]等の raw スライス）を
+                    # try/except で保護する。将来 color が #rgb 短縮形や rgb() 形式に
+                    # 変わった場合、または None の場合のクラッシュを防ぐ。
+                    _c = portfolios[selected_profile]["config"]["color"]
+                    try:
+                        _fill_color = (
+                            f"rgba({int(_c[1:3],16)},{int(_c[3:5],16)},{int(_c[5:7],16)},0.1)"
+                        )
+                    except (ValueError, TypeError, IndexError):
+                        _fill_color = "rgba(100,100,100,0.1)"
                     fig_fund.add_trace(go.Scatter(
                         x=fund_prices_normalized.index,
                         y=fund_prices_normalized.values,
                         mode='lines',
                         name=fund[:30] + '...' if len(fund) > 30 else fund,
-                        line=dict(color=portfolios[selected_profile]["config"]["color"], width=2),
+                        line=dict(color=_c, width=2),
                         fill='tozeroy',
-                        fillcolor=f"rgba({int(portfolios[selected_profile]['config']['color'][1:3], 16)}, "
-                                 f"{int(portfolios[selected_profile]['config']['color'][3:5], 16)}, "
-                                 f"{int(portfolios[selected_profile]['config']['color'][5:7], 16)}, 0.1)"
+                        fillcolor=_fill_color
                     ))
 
                     # 統計情報
@@ -856,8 +872,12 @@ def _render_tab_risk(
     with col1:
         # ローリングシャープ（月次リスクフリーレート控除、portfolio_utilsと定義を統一）
         rfr_monthly = rf_rate / 12
+        # [BUG-Ph5修正] > 0 → > 1e-8 に変更し portfolio_utils と閾値を統一。
+        # 定数系列の std(ddof=1) は浮動小数点誤差で ~1e-17 の非ゼロ値を返すことがあり、
+        # > 0 判定を通過して天文学的なシャープが表示される問題を防ぐ。
         rolling_sharpe = port_returns_series.rolling(window=12, min_periods=12).apply(
-            lambda x: ((x.mean() - rfr_monthly) * 12) / (x.std(ddof=1) * np.sqrt(12)) if x.std(ddof=1) > 0 else 0
+            lambda x: ((x.mean() - rfr_monthly) * 12) / (x.std(ddof=1) * np.sqrt(12))
+            if x.std(ddof=1) > 1e-8 else 0
         )
 
         fig_rs = go.Figure()
@@ -1162,6 +1182,15 @@ def _render_tab_constituents(
                 # リターン計算
                 fund_returns_full = fund_prices_full.pct_change(fill_method=None).dropna()
 
+                # [FIX-MEDIUM-Ph5-2] bench_returns_full をリターン表作成ループの前に
+                # 一度だけ計算してキャッシュする。
+                # 旧実装はループ内（5回）と定量分析（1回）の計6回同じ計算を実行していた。
+                # ループ前に計算することで 5/6 の無駄な再計算を排除する。
+                bench_returns_full: "pd.Series | None" = (
+                    bench_prices_full.pct_change(fill_method=None).dropna()
+                    if benchmark != "なし" else None
+                )
+
                 # リターン表作成
                 periods_dict = {
                     "1年": 12,
@@ -1175,27 +1204,27 @@ def _render_tab_constituents(
                 fund_name_short = fund[:30] + '...' if len(fund) > 30 else fund
 
                 return_data = []
-                for period_name, period_months in periods_dict.items():
-                    fund_ret = calc_annualized_return(fund_returns_full, period_months)
-
-                    if benchmark != "なし":
-                        bench_returns_full = bench_prices_full.pct_change(fill_method=None).dropna()
-                        bench_ret = calc_annualized_return(bench_returns_full, period_months)
-                    else:
-                        bench_ret = np.nan
-
+                # [FIX-MEDIUM-Ph5-1] ループ変数を _pname / _pmonths に変更。
+                # 旧実装の `period_months` は関数引数（分析期間の月数）と同名のため、
+                # ループ後に引数の値が上書きされ保守時に混乱を招くシャドウイングが発生していた。
+                for _pname, _pmonths in periods_dict.items():
+                    fund_ret  = calc_annualized_return(fund_returns_full, _pmonths)
+                    bench_ret = (
+                        calc_annualized_return(bench_returns_full, _pmonths)
+                        if bench_returns_full is not None else np.nan
+                    )
                     return_data.append({
-                        "期間": period_name,
+                        "期間": _pname,
                         fund_name_short: f"{fund_ret:.1f}%" if not np.isnan(fund_ret) else "N/A",
-                        benchmark if benchmark != "なし" else "ベンチマーク": 
+                        benchmark if benchmark != "なし" else "ベンチマーク":
                             f"{bench_ret:.1f}%" if not np.isnan(bench_ret) else "N/A"
                     })
 
                 # 定量分析計算（calculate_fund_metrics は portfolio_utils で一元管理）
+                # [FIX-MEDIUM-Ph5-2] bench_returns_full は上で計算済みのものを使う（再計算不要）
                 _rf = rf_rate
-                if benchmark != "なし":
-                    bench_returns_full = bench_prices_full.pct_change(fill_method=None).dropna()
-                    fund_metrics  = calculate_fund_metrics(fund_returns_full,  bench_returns_full, risk_free_rate=_rf)
+                if bench_returns_full is not None:
+                    fund_metrics  = calculate_fund_metrics(fund_returns_full, bench_returns_full, risk_free_rate=_rf)
                     bench_metrics = calculate_fund_metrics(bench_returns_full, risk_free_rate=_rf)
                 else:
                     fund_metrics  = calculate_fund_metrics(fund_returns_full, risk_free_rate=_rf)
@@ -1925,6 +1954,10 @@ def render_profile_detail(
     col_mode_l, col_mode_r = st.columns([6, 1])
     with col_mode_r:
         if st.session_state["view_mode"] == "client":
+            # [FIX-LOW-Ph5-2] view_mode は session_state のグローバル変数のため、
+            # どのプロファイルタブのボタンを押しても全タブのモードが一括切替される。
+            # ボタンキーがプロファイル別（mode_btn_{profile}）なのは Streamlit の
+            # キー重複エラーを避けるための命名であり、動作は1つのグローバルフラグで制御される。
             if st.button("担当者モード", key=f"mode_btn_{selected_profile}", use_container_width=True):
                 st.session_state["view_mode"] = "advisor"
                 st.rerun()
@@ -1974,7 +2007,12 @@ def render_profile_detail(
             fund_stats=fund_stats,
         )
 
-    # ── 担当者向けタブ描画（tab1〜3 は if not _is_client ブロック内） ──
+    # ── 担当者向けタブ描画（tab1〜6 すべて _is_client フラグで統一）──────
+    # [FIX-LOW-Ph5-1] 旧実装は tab1〜3 が `if not _is_client` ブロック、
+    # tab4〜6 が `if tab_N is not None` ガードという異なる方式が混在していた。
+    # tab は _is_client=True 時に None にセットされるため両者は等価だが、
+    # 読み手に「なぜ異なる書き方をするのか」という疑問を生じさせていた。
+    # 全タブを `if not _is_client` で統一し、意図を明確にする。
     if not _is_client:
         with tab1:
             _render_tab_performance(
@@ -1995,21 +2033,16 @@ def render_profile_detail(
                 df_filtered, port_returns, port_cum_returns,
                 rf_rate=rf_rate,
             )
-
-    # tab4〜6 は is not None ガード（元の構造を維持）
-    if tab4 is not None:
         with tab4:
             _render_tab_correlation(
                 selected_profile, selected_weights, selected_funds,
                 returns_selected, core_fund,
             )
-    if tab5 is not None:
         with tab5:
             _render_tab_montecarlo(
                 selected_profile, selected_weights, selected_stats,
                 returns_selected,
             )
-    if tab6 is not None:
         with tab6:
             _render_tab_constituents(
                 selected_profile, selected_weights, selected_funds,
