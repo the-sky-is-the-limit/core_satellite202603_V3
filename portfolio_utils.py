@@ -263,6 +263,7 @@ v2.0.3の技術的改善:
 3. 余剰再配分ロジック：max_individual 超過分を収束ループで確実に解消
 """
 import hashlib
+import threading
 import pandas as pd
 import numpy as np
 from scipy.optimize import minimize
@@ -464,8 +465,12 @@ class PortfolioAnalyzer:
         tau_monthly = self.risk_free_rate / self.periods_per_year
         downside_sq = np.minimum(port_returns - tau_monthly, 0) ** 2
         downside_dev = np.sqrt(downside_sq.mean()) * np.sqrt(self.periods_per_year)
+        # [FIX-LOW-Ph2-1] フォールバック値を int 0 → float 0.0 に統一。
+        # calmar（L489）は既に 0.0 で統一済みのため、sortino も揃える。
+        # 最終的に min(sortino, 999.99) で float になるため実害はないが、
+        # 型の一貫性として明示的に float を使う。
         sortino = excess_return / downside_dev if downside_dev > 0.0001 else (
-            np.inf if excess_return > 0 else 0
+            np.inf if excess_return > 0 else 0.0
         )
         
         # 最大ドローダウン
@@ -655,10 +660,13 @@ class PortfolioAnalyzer:
 
         if len(raw_vols) < 2:
             # 収束失敗フォールバック：均等配分の単点を返す
-            w_fb  = np.ones(n_assets) / n_assets
+            w_fb   = np.ones(n_assets) / n_assets
             port_r = self.returns.values @ w_fb
             cum_r  = (1 + port_r).prod() - 1
-            cagr   = (1 + cum_r) ** (self.periods_per_year / len(port_r)) - 1
+            # [BUG-Ph2修正] base ≤ 0（全損）は CAGR 未定義（複素数になる）→ 0.0 で補完。
+            # _calculate_statistics / calculate_portfolio_stats と同一ガードを追加。
+            _base  = 1.0 + cum_r
+            cagr   = _base ** (self.periods_per_year / len(port_r)) - 1 if _base > 0 else 0.0
             return pd.DataFrame({
                 'リターン':      [float(np.dot(w_fb, mu))],
                 'リターン_CAGR': [cagr],
@@ -922,19 +930,46 @@ class PortfolioAnalyzer:
 
         CLARABEL の内部精度（~1e-8）による微小な bounds 逸脱を修正する。
         全ての CVXPY return パスで共通使用する。
+
+        [BUG-Ph3修正] 旧実装は delta をコアで吸収しきれない場合（コアが bounds 端に達している
+        ケース）にサイレントで sum≠1 のウェイトを返していた。
+        _project_to_feasible_simplex の v2.0.1 修正（第2段階 delta 再配分）と同等の
+        2段階保証を追加し、CVXPY パスと SLSQP パスで同一の制約堅牢性を保証する。
         """
         w = w_raw.copy()
         w[~active] = 0.0
         core_lo, core_hi = core_weight_range
         w[core_fund_idx] = np.clip(w[core_fund_idx], core_lo, core_hi)
         _anc = active & (np.arange(len(w)) != core_fund_idx)
-        if min_individual > 0:
-            w[_anc] = np.clip(w[_anc], min_individual, max_individual)
-        else:
-            w[_anc] = np.clip(w[_anc], 0.0, max_individual)
-        # sum=1 微調整（クリップで崩れた分をコアで吸収）
+        _lo_anc = min_individual if min_individual > 0 else 0.0
+        w[_anc] = np.clip(w[_anc], _lo_anc, max_individual)
+
+        # ── sum=1 調整（1回目: コアで吸収）──────────────────────────────
         _delta = 1.0 - w.sum()
         w[core_fund_idx] = np.clip(w[core_fund_idx] + _delta, core_lo, core_hi)
+
+        # ── sum=1 調整（2回目: コアで吸収しきれない分を非コアに比例配分）────
+        # コアが bounds 端に達していると 1 回目で delta が残る。
+        # _project_to_feasible_simplex の第2段階 delta 再配分と同一ロジックで解消する。
+        _delta2 = 1.0 - w.sum()
+        if abs(_delta2) > 1e-8:
+            _adjustable = [i for i in range(len(w)) if active[i] and i != core_fund_idx]
+            if _delta2 > 0:
+                # 増やす: 上限までの余地を比例配分
+                headrooms = {i: max_individual - w[i] for i in _adjustable}
+                total_hr = sum(v for v in headrooms.values() if v > 0)
+                if total_hr > 0:
+                    for i in _adjustable:
+                        if headrooms[i] > 0:
+                            w[i] += min(_delta2 * (headrooms[i] / total_hr), headrooms[i])
+            else:
+                # 減らす: 下限までの余地を比例配分
+                slacks = {i: w[i] - _lo_anc for i in _adjustable}
+                total_sl = sum(v for v in slacks.values() if v > 0)
+                if total_sl > 0:
+                    for i in _adjustable:
+                        if slacks[i] > 0:
+                            w[i] -= min(-_delta2 * (slacks[i] / total_sl), slacks[i])
         return w
 
     def _optimize_cvxpy(
@@ -1237,6 +1272,15 @@ class PortfolioAnalyzer:
         budget[all_active] = 1.0 / n_all
 
         w_var = _cp.Variable(n)
+        # [FIX-MEDIUM-Ph3-2] 下限に min_individual ではなく _EPS=1e-6 を使う理由を明記。
+        # Spinu (2013) の log-barrier 定式化では目的関数に -budget @ log(w) が含まれる。
+        # log(w) は w → 0 で -∞ に発散するため、下限をゼロに近づけると
+        # ソルバーが収束しないか数値的に不安定になる。
+        # _EPS=1e-6 は「log-barrier の安定動作に必要な最小の正値」として設定したもので、
+        # min_individual（デフォルト 0.03）より大幅に小さい。
+        # Spinu 解は直接 return せず SLSQP マルチスタートの初期点として注入するため、
+        # 最終ウェイトの min_individual 制約は SLSQP の bounds が担保する。
+        # 将来 min_individual に変更すると log-barrier が退化するため変更しないこと。
         lo = np.full(n, _EPS)
         lo[core_fund_idx] = max(core_lo, _EPS)
         hi = np.full(n, max_individual)
@@ -1342,7 +1386,10 @@ class PortfolioAnalyzer:
         if objective_type == 'sharpe':
             def objective(w):
                 ret, vol = portfolio_stats(w)
-                return -(ret - self.risk_free_rate) / vol if vol > 0 else 0.0
+                # [FIX-LOW-Ph3-1] > 0 → > 1e-8 に変更し Jacobian（L1527）と閾値を統一。
+                # 定数系列の vol は浮動小数点誤差で ~1e-17 の非ゼロ値を返すことがあり、
+                # > 0 では天文学的なシャープ値が生成されるリスクがある。
+                return -(ret - self.risk_free_rate) / vol if vol > 1e-8 else 0.0
 
         elif objective_type == 'max_cagr':
             # CAGR ≈ μ - σ²/2 を最大化。積極型向け。
@@ -1545,10 +1592,13 @@ class PortfolioAnalyzer:
                 # [D4注記] k=1-2 では argpartition のタイ（同値）不安定により
                 # worst-k 集合がイテレーション毎に急に切り替わり、サブグラジェントが
                 # 不連続になって SLSQP の収束が振動するリスクがある。
-                # この問題を回避するため、_optimize_cvxpy() 側で k<3 のときは
-                # Rockafellar-Uryasev LP 定式化を使わず None を返し、
-                # SLSQP パスにフォールバックさせている（L896-897）。
-                # k≥3（60ヶ月以上）ではタイの影響が希釈されるため実害なし。
+                #
+                # [FIX-MEDIUM-Ph3-1] stale comment を修正。
+                # v3.5.0 より _optimize_cvxpy() の k<3 フォールバック条件は撤廃済み。
+                # 現行設計: 全データ長で CVXPY Rockafellar-Uryasev LP を使用する
+                # （T=36, k=1 のベンチマークで LP が SLSQP 同等以上の CVaR を 23x 高速に達成）。
+                # この Jacobian は CVXPY が失敗した場合の完全フォールバック用であり、
+                # k=1 でのタイ不安定リスクは CVXPY フォールバック自体が稀なため実害は限定的。
                 def _jac_fn(w):
                     port_r    = _ret_matrix @ w
                     idx_worst = np.argpartition(port_r, _k_cvar)[:_k_cvar]
@@ -1630,7 +1680,14 @@ class PortfolioAnalyzer:
         feasible_upper   = core_hi + (n_active - 1) * max_individual >= 1.0 - 1e-6
 
         if not (feasible_lower and feasible_upper):
-            return w1
+            # [BUG-Ph3修正] 旧実装は w1（SLSQP の生ウェイト）を無射影で返していた。
+            # CVXPY パスの同等箇所（L1069-1071）は _cvxpy_clip_and_normalize を通して
+            # 微小な制約違反を修正してから返しており、SLSQP パスも同様に処理すべき。
+            # min_individual=0.0 で呼ぶことで一次最適化の探索空間（bounds下限なし）と整合する。
+            return self._project_to_feasible_simplex(
+                w1, np.ones(n_assets, dtype=bool),
+                core_fund_idx, core_weight_range, 0.0, max_individual
+            )
 
         # ── 二次最適化（アクティブセット固定 + マルチスタート2点）────────────
         # [速度改善] 3点→2点に削減。アクティブセット固定後は探索空間が狭いため
@@ -1642,6 +1699,12 @@ class PortfolioAnalyzer:
         )
 
         rng_2nd  = np.random.default_rng(99)
+        # [FIX-LOW-Ph3-2] シード 99 の設計意図を明記。
+        # 一次最適化（rng_ms, seed=42）と異なる値にすることで初期点の多様性を確保している。
+        # 二次最適化は現在 1 ランダム点のみのため、固定シードでも実害は小さい。
+        # 将来 n_restarts_2nd を増やす場合はシードを None（毎回異なる乱数）にするか、
+        # プロファイル・コアファンドの組み合わせに基づくハッシュ値に変更して
+        # 初期点の多様性を保証すること。
         starts_2nd: List[np.ndarray] = [
             self._project_to_feasible_simplex(
                 w1, active, core_fund_idx, core_weight_range, min_individual, max_individual
@@ -1700,6 +1763,11 @@ class FundScreener:
     #     Streamlit のサーバー常時起動環境で数百エントリが蓄積し続けることを防ぐ。
     _statistics_cache: Dict[str, "pd.DataFrame"] = {}
     _CACHE_MAX_SIZE: int = 32  # エントリ上限（32 × ~2MB = 最大約 64MB が目安）
+    # [FIX-MEDIUM-Ph2-3] スレッドセーフ化: クラスレベルの Lock を追加。
+    # Streamlit の通常稼働（シングルスレッド）では影響はないが、
+    # --server.runOnSave や実験的マルチスレッドモードで LRU 削除 + 挿入が
+    # race condition になる問題を防ぐ。Lock は軽量なため通常時のオーバーヘッドは無視できる。
+    _cache_lock: threading.Lock = threading.Lock()
 
     # キャッシュファンド検出用の最低ボラティリティ閾値（年率）
     # 3%を選択した理由:
@@ -1729,19 +1797,27 @@ class FundScreener:
         # キャッシュキー: リターンデータのハッシュ + 年間期数 + 無リスク金利。
         # 旧実装は常に False を設定するだけでキャッシュ機構が存在しなかったため
         # test_app.py テスト4 [A3] が必ず AssertionError になっていた。
+        #
+        # [FIX-MEDIUM-Ph2-3] double-check ロックパターンでスレッドセーフ化。
+        # 高コストな _calculate_statistics() は Lock 外で実行しロック保持時間を最小化する。
+        # 結果の格納のみを Lock 内で行い、別スレッドが先に書き込んだ場合は上書きしない。
         _cache_key = self._make_stats_cache_key(returns, periods_per_year, risk_free_rate)
-        if _cache_key in FundScreener._statistics_cache:
-            # キャッシュヒット: 深いコピーを返して汚染防止
-            self.statistics = FundScreener._statistics_cache[_cache_key].copy()
+        # ① ロックなしで先読み（ヒットの大半はここで完結・ロックコストゼロ）
+        _cached = FundScreener._statistics_cache.get(_cache_key)
+        if _cached is not None:
+            self.statistics = _cached.copy()
             self._stats_cache_hit: bool = True
         else:
-            # キャッシュミス: 新規計算してキャッシュに格納
-            self.statistics = self._calculate_statistics()
-            # サイズ上限を超えた場合は最も古いエントリを削除（挿入順辞書の先頭 = 最古）
-            if len(FundScreener._statistics_cache) >= FundScreener._CACHE_MAX_SIZE:
-                oldest_key = next(iter(FundScreener._statistics_cache))
-                del FundScreener._statistics_cache[oldest_key]
-            FundScreener._statistics_cache[_cache_key] = self.statistics.copy()
+            # キャッシュミス: 重い計算を Lock 外で実行
+            _new_stats = self._calculate_statistics()
+            # ② Lock 内で再確認してから書き込む
+            with FundScreener._cache_lock:
+                if _cache_key not in FundScreener._statistics_cache:
+                    if len(FundScreener._statistics_cache) >= FundScreener._CACHE_MAX_SIZE:
+                        oldest_key = next(iter(FundScreener._statistics_cache))
+                        del FundScreener._statistics_cache[oldest_key]
+                    FundScreener._statistics_cache[_cache_key] = _new_stats.copy()
+            self.statistics = _new_stats
             self._stats_cache_hit = False
 
     @staticmethod
@@ -1797,6 +1873,13 @@ class FundScreener:
                 stats.loc[col, '年率リターン'] = 0.0
 
         # 年率ボラティリティ（ddof=1）
+        # [FIX-MEDIUM-Ph2-1] 計算経路の等価性を明示するコメントを追加。
+        # self.returns.std(skipna=True)（pandas デフォルト）は列ごとに NaN を除外して計算するため、
+        # 以下の統合ループ内の `r = self.returns[col].dropna()` → `r.std(ddof=1)` と
+        # 完全に同一の有効データ点・同一 n_p を使う。
+        # つまりシャープ（一括計算）とソルティノ（ループ内 dropna）は同じ分母 n を共有しており、
+        # 計算経路が異なっても定義上の乖離は生じない。
+        # 将来 fill_method や前処理を変更する際は両経路の等価性を再確認すること。
         stats['年率ボラ'] = self.returns.std(ddof=1) * np.sqrt(self.periods_per_year)
 
         # 超過リターン・シャープレシオ（算術平均ベース）
@@ -2071,16 +2154,25 @@ class FundScreener:
         },
     ]
 
-    # [V1] バケットウェイト合計のバリデーション
-    # 各バケットの weights 辞書合計が 1.0 ± 0.001 でない場合、将来の修正で
-    # バランスが崩れた際にスコアの公平性が壊れるため、モジュールロード時に検出する。
-    for _bkt_v in CORRELATION_BUCKETS:
-        _w_sum = sum(_bkt_v['weights'].values())
-        if abs(_w_sum - 1.0) > 0.001:
-            raise ValueError(
-                f"CORRELATION_BUCKETS '{_bkt_v['name']}' の weights 合計が "
-                f"{_w_sum:.4f} です（期待値: 1.0 ± 0.001）。ウェイトを修正してください。"
-            )
+    # [FIX-LOW-Ph2-2] バケットウェイト合計バリデーションを classmethod に分離。
+    # 旧実装はクラスボディ直書きの for ループで実行しており、
+    # IDE が「クラス変数の定義後にメソッド以外の実行文がある」と警告を発することがあった。
+    # @classmethod に分離することでクラス定義として正当な形になり、
+    # モジュールロード時に __init_subclass__ 相当のタイミングで呼び出す。
+    @classmethod
+    def _validate_bucket_weights(cls) -> None:
+        """CORRELATION_BUCKETS の各バケット weights 合計が 1.0 ± 0.001 かを検証。
+
+        将来バケットのウェイトを変更した際にスコアの公平性が崩れることを
+        モジュールロード時に即座に検出するために使用する。
+        """
+        for _bkt_v in cls.CORRELATION_BUCKETS:
+            _w_sum = sum(_bkt_v['weights'].values())
+            if abs(_w_sum - 1.0) > 0.001:
+                raise ValueError(
+                    f"CORRELATION_BUCKETS '{_bkt_v['name']}' の weights 合計が "
+                    f"{_w_sum:.4f} です（期待値: 1.0 ± 0.001）。ウェイトを修正してください。"
+                )
 
     # デフォルトのバケット別割当枠（コアを除く n_final-1 本の配分比率）
     # キーはバケット名、値は割当の「重み」（実際の本数は n_final に応じてスケール）
@@ -2237,9 +2329,14 @@ class FundScreener:
             各クラスターからスコア最高の1本を選定する。
             同一戦略ファンドへの集中を防止し、真の多様性を確保する。
             """
-            if len(pool_returns_sub.columns) <= take:
-                return scored_pool.nlargest(take, score_col).index.tolist()
+            # [BUG-Ph2修正] 旧実装は「len <= take」を先に評価していたため、
+            # 「len < 2（クラスタリング不可）」が永遠に到達しない dead code だった。
+            # ① ファンド数が2未満 → クラスタリング自体が不可能なので早期脱出
+            # ② ファンド数が take 以下 → クラスタリング不要なので早期脱出
+            # の順に評価することで両方の早期脱出が正しく機能する。
             if len(pool_returns_sub.columns) < 2:
+                return scored_pool.nlargest(take, score_col).index.tolist()
+            if len(pool_returns_sub.columns) <= take:
                 return scored_pool.nlargest(take, score_col).index.tolist()
 
             try:
@@ -2382,6 +2479,14 @@ class FundScreener:
                 # バランス型スコア（中低相関バケットのウェイト）で再評価
                 # [改善B] ランク正規化を補完スコアにも適用
                 # [改善C] corr_stability が利用可能な場合は補完にも組み込む
+                #
+                # [FIX-MEDIUM-Ph2-2] 補完スコアに corr_down（条件付き下落相関）が含まれない理由を明記。
+                # 中低相関バケットの weights['corr_down'] = 0.0 であるため、
+                # balance_w.get('corr_down', 0) は常に 0 を返し、項を追加しても結果は変わらない。
+                # これは「中低相関バケットは下落時相関よりシャープ・DD・相関安定性を重視する」
+                # という設計意図に基づく意図的な省略であり、バグではない。
+                # 将来 balance_w の corr_down ウェイトを変更する際は、
+                # 補完スコア計算にも norm_corr_down を追加すること。
                 balance_w = next(b['weights'] for b in self.CORRELATION_BUCKETS if b['name'] == '中低相関')
 
                 norm_sharpe  = _normalize(remaining_pool['シャープレシオ'])
@@ -2651,3 +2756,9 @@ def export_results_to_excel(portfolios: Dict,
                 fund_stats_export[col] = fund_stats_export[col] * 100
         
         fund_stats_export.to_excel(writer, sheet_name='ファンド統計')
+
+
+# [FIX-LOW-Ph2-2] クラス定義完了後にバリデーションを実行（モジュールロード時に1回）。
+# 旧実装ではクラスボディ内の for ループで実行していたが、
+# classmethod に分離したためここで明示的に呼び出す。
+FundScreener._validate_bucket_weights()
