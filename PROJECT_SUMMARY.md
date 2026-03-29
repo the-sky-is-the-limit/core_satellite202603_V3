@@ -21,27 +21,37 @@
    - FundScreener クラス（多段階スクリーニング）
    - 約890行
 
-4. **requirements.txt**
+4. **portfolio_data.py**
+   - データ層（Excel読込・概観テーブル計算・表示整形）
+   - 通貨列フィルタ（CURRENCY_KEYWORDS）の一元管理
+   - 約400行
+
+5. **portfolio_report.py**
+   - レポート層（サマリーパネル・Excelエクスポート）
+   - リスクパリティポートフォリオ計算
+   - 約1,300行
+
+7. **requirements.txt**
    - 必要なPythonパッケージリスト
 
-5. **run_app.sh**
+8. **run_app.sh**
    - アプリ起動用シェルスクリプト
    - 実行権限付き
 
-6. **test_app.py**
+9. **test_app.py**
    - 動作確認用テストスクリプト
 
 ### ドキュメント
-7. **README.md**
+10. **README.md**
    - 詳細な技術ドキュメント
    - API仕様
    - カスタマイズ方法
 
-8. **QUICKSTART.md**
+11. **QUICKSTART.md**
    - 1分で始められるガイド
    - よくある質問
 
-9. **frends202512.xlsx**
+12. **frends202512.xlsx**
    - サンプルデータ（154ファンド、420データポイント）
 
 ---
