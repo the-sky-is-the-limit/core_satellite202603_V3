@@ -44,7 +44,7 @@ st.markdown("""
         background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1f4e79 100%);
         padding: 22px 32px 18px;
         border-bottom: 3px solid #b3904a;
-        margin: -1rem -1rem 1.38rem -1rem;
+        margin: -1rem -7.5vw 1.38rem -7.5vw;
         color: #fff;
     }
     .hfd-header-eyebrow {
@@ -609,11 +609,14 @@ st.markdown("""
     }
 
     /* ── レイアウト幅制御 ── */
-    /* layout="wide" のデフォルトはpadding過大でコンテンツが狭くなりがち。
-       左右paddingを抑えてレポート・カード・テーブルの表示幅を確保。 */
+    /* Streamlit layout="wide" は block-container にインラインで max-width を設定する。
+       これを none で解除し、左右 7.5vw の padding でコンテンツ幅を約85%に制御。
+       ヘッダー（.hfd-header）はネガティブマージンで全幅を維持する。 */
     .main .block-container {
-        padding-left: 3rem !important;
-        padding-right: 3rem !important;
+        max-width: none !important;
+        width: 100% !important;
+        padding-left: 7.5vw !important;
+        padding-right: 7.5vw !important;
         padding-top: 1rem !important;
     }
 
