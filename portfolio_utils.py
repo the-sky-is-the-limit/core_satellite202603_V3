@@ -1,5 +1,36 @@
 """
-ポートフォリオ最適化 - ユーティリティ関数（改善版 v3.4.2）
+ポートフォリオ最適化 - ユーティリティ関数（改善版 v3.4.3）
+
+改善内容（v3.4.3 — コードレビュー修正 2026-03）:
+
+✅ [P1] シャープレシオ解析的勾配の sqrt ガード追加
+   - np.dot(w, cov_w) が浮動小数点誤差で微小負値を返した場合に
+     np.sqrt が nan を生成する問題を修正。max(..., 0.0) でガード。
+   - max_cagr / volatility の勾配にも同一ガードを追加。
+
+✅ [P2] 射影関数 Step6 のスケーリング閾値を強化
+   - 旧実装: total > 0 で除算 → total ≈ 1e-15 で値が爆発するリスク。
+   - 新実装: total > 1e-6 に変更し、実質ゼロでの異常スケーリングを防止。
+
+✅ [P3] CVXPYパスの戻り値にクリップ処理を追加
+   - CLARABEL ソルバーの内部精度（~1e-8）により bounds を微小に逸脱する
+     ケースで、_project_to_feasible_simplex を通さず return していた2箇所を修正。
+   - 一段目のみで返す場合（可行性不足時）も np.clip で bounds を保証。
+
+✅ [D1] 射影関数のベクタライズ化
+   - Step3/Step5 の for ループを NumPy ベクタライズに置換。
+   - n_assets=30 で可読性向上・マイクロ最適化。
+
+✅ [D3] CVXPYパス vs SLSQPパスのアクティブセット閾値差異をコメントで明示
+   - CVXPY一段目は relaxed bounds（min_individual=0）のため
+     閾値を min_individual × 0.5 に緩和している理由を明記。
+
+✅ [D4] min_cvar サブグラジェント不連続性のコメント追記
+   - k=1-2 での argpartition タイ不安定→CVXPY フォールバックの設計意図を明記。
+
+✅ [V1] バケットウェイト合計のバリデーション追加
+   - CORRELATION_BUCKETS の各バケット weights 合計が 1.0 ± 0.001 でない場合
+     モジュールロード時に ValueError を発生させ、将来の修正時のバグを防止。
 
 改善内容（v3.4.2 — コードレビュー修正 2026-03）:
 
@@ -721,10 +752,9 @@ class PortfolioAnalyzer:
         w_core = np.clip(weights[core_fund_idx], core_min, core_max)
         w_proj[core_fund_idx] = w_core
         
-        # 3. アクティブ非コアをbounds内にクリップ
-        for i in range(n_assets):
-            if i != core_fund_idx and active[i]:
-                w_proj[i] = np.clip(weights[i], min_individual, max_individual)
+        # 3. アクティブ非コアをbounds内にクリップ（[D1] ベクタライズ版）
+        _active_non_core = active & (np.arange(n_assets) != core_fund_idx)
+        w_proj[_active_non_core] = np.clip(weights[_active_non_core], min_individual, max_individual)
         
         # 4. 合計が1からズレた分を調整
         delta = 1.0 - w_proj.sum()
@@ -770,26 +800,26 @@ class PortfolioAnalyzer:
                         RuntimeWarning, stacklevel=2
                     )
         
-        # 5. 最終的なboundsチェック（念のため）
+        # 5. 最終的なboundsチェック（念のため）（[D1] ベクタライズ版）
         w_proj[~active] = 0
         w_proj[core_fund_idx] = np.clip(w_proj[core_fund_idx], core_min, core_max)
-        for i in range(n_assets):
-            if i != core_fund_idx and active[i]:
-                w_proj[i] = np.clip(w_proj[i], min_individual, max_individual)
+        _active_nc_mask = active & (np.arange(n_assets) != core_fund_idx)
+        w_proj[_active_nc_mask] = np.clip(w_proj[_active_nc_mask], min_individual, max_individual)
         
         # 6. 最終的な正規化チェック
         total = w_proj.sum()
         if abs(total - 1.0) > 1e-6:
             # 微小な誤差は比例配分で吸収
-            if total > 0:
+            # [P2修正] total ≈ 1e-15 のような実質ゼロで除算すると値が爆発するため
+            # 閾値を 1e-6 に強化。total < 1e-6 は可行性違反（事前チェックで弾かれるはず）。
+            if total > 1e-6:
                 # 全体を等比縮小/拡大（bounds内に収まる範囲で）
                 scale_factor = 1.0 / total
                 w_proj = w_proj * scale_factor
-                # 再度boundsクリップ（スケーリングでずれた場合）
+                # [D1] 再度boundsクリップ（ベクタライズ版）
                 w_proj[core_fund_idx] = np.clip(w_proj[core_fund_idx], core_min, core_max)
-                for i in range(n_assets):
-                    if i != core_fund_idx and active[i]:
-                        w_proj[i] = np.clip(w_proj[i], min_individual, max_individual)
+                _active_nc = active & (np.arange(n_assets) != core_fund_idx)
+                w_proj[_active_nc] = np.clip(w_proj[_active_nc], min_individual, max_individual)
                 
                 # --- 追加: scale→clip後にsum=1が崩れる可能性があるため、deltaを再配分して最終保証 ---
                 total2 = w_proj.sum()
@@ -941,7 +971,24 @@ class PortfolioAnalyzer:
             return None
         w1 = np.array(w1_var.value).flatten()
 
-        # ── アクティブセット確定（SLSQPパスと同一ロジック）──────────────────
+        # [P3修正] CLARABEL ソルバーは内部精度 ~1e-8 で解を返すため、
+        # optimal_inaccurate の場合に bounds を微小に逸脱することがある。
+        # 全ての return パスで bounds クリップを保証する。
+        def _clip_w1(w):
+            """一段目の bounds でクリップ（min_individual=0 の relaxed bounds）"""
+            w = np.clip(w, 0.0, max_individual)
+            w[core_fund_idx] = np.clip(w[core_fund_idx], core_weight_range[0], core_weight_range[1])
+            # sum=1 の微調整（クリップで崩れた分をコアで吸収）
+            _delta = 1.0 - w.sum()
+            _new_core = np.clip(w[core_fund_idx] + _delta, core_weight_range[0], core_weight_range[1])
+            w[core_fund_idx] = _new_core
+            return w
+
+        # ── アクティブセット確定 ──────────────────────────────────────────────
+        # [D3注記] 閾値 min_individual × 0.5 は SLSQP パス（L1340: w1 >= min_individual）
+        # より緩い。理由: CVXPY 一段目は relaxed bounds（min_individual=0）で解くため、
+        # 真にゼロ近傍だが最適解に含まれるべき銘柄のウェイトが min_individual 未満に
+        # なりやすい。0.5 倍の閾値でこれらを拾い上げ、二段目で min_individual を適用する。
         active = (w1 >= min_individual * 0.5) | (np.arange(n) == core_fund_idx)
         if active.sum() <= 1:
             nc_w = w1.copy()
@@ -953,7 +1000,7 @@ class PortfolioAnalyzer:
         feasible_lower = core_lo + (n_active - 1) * min_individual <= 1.0 + 1e-6
         feasible_upper = core_hi + (n_active - 1) * max_individual >= 1.0 - 1e-6
         if not (feasible_lower and feasible_upper):
-            return w1
+            return _clip_w1(w1)  # [P3修正]
 
         # ── 二段目: アクティブセット固定 + min_individual制約 ────────────────
         w2_var = _cp.Variable(n)
@@ -970,14 +1017,23 @@ class PortfolioAnalyzer:
 
         prob2 = _build_problem(w2_var, lower2, upper2, objective_type, target_volatility)
         if prob2 is None:
-            return w1
+            return _clip_w1(w1)  # [P3修正]
         try:
             prob2.solve(solver=_SOLVER, verbose=False)
         except Exception:
-            return w1
+            return _clip_w1(w1)  # [P3修正]
         if prob2.status in ('optimal', 'optimal_inaccurate') and w2_var.value is not None:
-            return np.array(w2_var.value).flatten()
-        return w1
+            # [P3修正] 二段目の bounds でクリップ
+            w2 = np.array(w2_var.value).flatten()
+            w2[~active] = 0.0
+            w2[core_fund_idx] = np.clip(w2[core_fund_idx], core_lo, core_hi)
+            _active_nc = active & (np.arange(n) != core_fund_idx)
+            w2[_active_nc] = np.clip(w2[_active_nc], min_individual, max_individual)
+            _delta2 = 1.0 - w2.sum()
+            _new_core2 = np.clip(w2[core_fund_idx] + _delta2, core_lo, core_hi)
+            w2[core_fund_idx] = _new_core2
+            return w2
+        return _clip_w1(w1)  # [P3修正]
 
     def optimize_portfolio(self,
                           core_fund_idx: int,
@@ -1218,7 +1274,10 @@ class PortfolioAnalyzer:
                 def _jac_fn(w):
                     ret = np.dot(w, mu_vals) - _rf
                     cov_w = np.dot(cov_vals, w)
-                    vol = np.sqrt(np.dot(w, cov_w))
+                    # [P1修正] wᵀΣw が浮動小数点誤差で微小負値を返す場合に
+                    # np.sqrt が nan を生成するため max(..., 0.0) でガード。
+                    # 目的関数側の _vol() は既に同ガードを適用済み。
+                    vol = np.sqrt(max(float(np.dot(w, cov_w)), 0.0))
                     if vol < 1e-8:
                         return np.zeros(n_assets)
                     return -(mu_vals * vol - ret * cov_w / vol) / (vol * vol)
@@ -1230,12 +1289,20 @@ class PortfolioAnalyzer:
             elif objective_type == 'volatility':
                 def _jac_fn(w):
                     cov_w = np.dot(cov_vals, w)
-                    vol = np.sqrt(np.dot(w, cov_w))
+                    # [P1修正] sharpe と同様の sqrt ガード
+                    vol = np.sqrt(max(float(np.dot(w, cov_w)), 0.0))
                     if vol < 1e-8:
                         return np.zeros(n_assets)
                     return cov_w / vol
 
             elif objective_type == 'min_cvar':
+                # [D4注記] k=1-2 では argpartition のタイ（同値）不安定により
+                # worst-k 集合がイテレーション毎に急に切り替わり、サブグラジェントが
+                # 不連続になって SLSQP の収束が振動するリスクがある。
+                # この問題を回避するため、_optimize_cvxpy() 側で k<3 のときは
+                # Rockafellar-Uryasev LP 定式化を使わず None を返し、
+                # SLSQP パスにフォールバックさせている（L896-897）。
+                # k≥3（60ヶ月以上）ではタイの影響が希釈されるため実害なし。
                 def _jac_fn(w):
                     port_r    = _ret_matrix @ w
                     idx_worst = np.argpartition(port_r, _k_cvar)[:_k_cvar]
@@ -1757,6 +1824,17 @@ class FundScreener:
             'use_clustering': False,
         },
     ]
+
+    # [V1] バケットウェイト合計のバリデーション
+    # 各バケットの weights 辞書合計が 1.0 ± 0.001 でない場合、将来の修正で
+    # バランスが崩れた際にスコアの公平性が壊れるため、モジュールロード時に検出する。
+    for _bkt_v in CORRELATION_BUCKETS:
+        _w_sum = sum(_bkt_v['weights'].values())
+        if abs(_w_sum - 1.0) > 0.001:
+            raise ValueError(
+                f"CORRELATION_BUCKETS '{_bkt_v['name']}' の weights 合計が "
+                f"{_w_sum:.4f} です（期待値: 1.0 ± 0.001）。ウェイトを修正してください。"
+            )
 
     # デフォルトのバケット別割当枠（コアを除く n_final-1 本の配分比率）
     # キーはバケット名、値は割当の「重み」（実際の本数は n_final に応じてスケール）
