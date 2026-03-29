@@ -96,13 +96,13 @@ st.markdown("""
     /* ── プロファイルカード ── */
     .profile-cards-wrap {
         display: flex;
-        gap: 10px;
+        gap: 8px;
         margin-bottom: 14px;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
     }
     .profile-card {
-        flex: 1;
-        min-width: 185px;
+        flex: 1 1 0;
+        min-width: 0;
         border-radius: 6px;
         overflow: hidden;
         border: 2px solid #e8ecf0;
@@ -136,7 +136,7 @@ st.markdown("""
         margin-top: 8px;
     }
     .profile-card-ret {
-        font-size: 1.84rem;
+        font-size: 1.65rem;
         font-weight: 800;
         line-height: 1;
     }
@@ -154,9 +154,9 @@ st.markdown("""
         margin-bottom: 5px;
         font-size: 0.86rem;
     }
-    .profile-card-row-label { color: #2f3e4d; }
+    .profile-card-row-label { color: #2f3e4d; word-break: keep-all; overflow-wrap: break-word; }
     .profile-card-row-label-sub { font-size: 0.69rem; color: #4f6270; display: block; line-height: 1.3; margin-top: 1px; }
-    .profile-card-row-val   { font-weight: 700; color: #1e3a5f; text-align: right; flex-shrink: 0; margin-left: 4px; }
+    .profile-card-row-val   { font-weight: 700; color: #1e3a5f; text-align: right; flex-shrink: 0; margin-left: 4px; white-space: nowrap; }
     .risk-bar-wrap { margin-top: 8px; }
     /* ── プロファイル解説文 ── */
     .profile-card-commentary {
