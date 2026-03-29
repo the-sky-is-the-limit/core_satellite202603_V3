@@ -1054,9 +1054,9 @@ def render_report_panel(
         st.caption(
             f"コアファンド「{core_fund}」行は青ハイライト。"
             "　リターン: +10%超=濃緑 / +3〜10%=緑 / 0〜3%=薄緑 / マイナス=赤。"
-            "　シャープ: <span style="color:#1e7a4e;">■</span>1.0超 / <span style="color:#d4a017;">■</span>0.5-1.0 / <span style="color:#c0392b;">■</span>0.5未満。"
-            "　最大DD: <span style="color:#1e7a4e;">■</span>-10%以内 / <span style="color:#d4a017;">■</span>-10〜-25% / <span style="color:#c0392b;">■</span>-25%超。"
-            "　コア相関: <span style="color:#1e7a4e;">■</span>0.3-0.7=分散◎ / <span style="color:#d4a017;">■</span>0.7-0.9=やや高 / <span style="color:#c0392b;">■</span>0.9超=高相関 / 灰=低相関。"
+            "　シャープ: <span style='color:#1e7a4e;'>■</span>1.0超 / <span style='color:#d4a017;'>■</span>0.5-1.0 / <span style='color:#c0392b;'>■</span>0.5未満。"
+            "　最大DD: <span style='color:#1e7a4e;'>■</span>-10%以内 / <span style='color:#d4a017;'>■</span>-10〜-25% / <span style='color:#c0392b;'>■</span>-25%超。"
+            "　コア相関: <span style='color:#1e7a4e;'>■</span>0.3-0.7=分散◎ / <span style='color:#d4a017;'>■</span>0.7-0.9=やや高 / <span style='color:#c0392b;'>■</span>0.9超=高相関 / 灰=低相関。"
             "　列ヘッダーをクリックで昇順/降順ソートが可能（数値として正しく並び替え）。"
         )
     with _rpt_tab3:
