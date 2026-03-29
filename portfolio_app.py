@@ -608,6 +608,16 @@ st.markdown("""
         background: rgba(179,144,74,0.08) !important;
     }
 
+    /* ── レイアウト幅制御 ── */
+    /* layout="wide" のデフォルトは画面100%だが、データテーブルやチャートが
+       横に広がりすぎて視認性が落ちるため、85%に制限して中央寄せ。
+       ヘッダー（.hfd-header）はネガティブマージンで全幅を維持。 */
+    .main .block-container {
+        max-width: 85% !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
+    }
+
 </style>
 """, unsafe_allow_html=True)
 
