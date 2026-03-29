@@ -10,3 +10,8 @@ plotly>=5.18.0,<7.0.0
 openpyxl>=3.1.0,<4.0.0
 # scikit-learn 1.8 で LedoitWolf API に後方互換変更なし（1.x 系で確認済み）。
 scikit-learn>=1.0.0,<2.0.0
+# [Phase1] CVXPY凸最適化ソルバー。volatility / max_cagr / risk_adjusted を
+# QP/SOCP として解き、SLSQPのマルチスタートループを不要にする。
+# CLARABELソルバーを同梱しているため追加のソルバーインストールは不要。
+# 未インストール時はSLSQPにサイレントフォールバックし後方互換性を維持。
+cvxpy>=1.4.0,<2.0.0
