@@ -297,7 +297,7 @@ def _render_client_view(
       <div class="card">
     <div class="card-title">年次リターン（棒グラフ）<span style="margin-left:8px;background:rgba(122,92,30,0.08);border:1px solid rgba(122,92,30,0.22);border-radius:3px;padding:1px 7px;font-size:15px;color:#7A5C1E;letter-spacing:0.06em;">過去実績</span></div>
     <div class="card-sub">各暦年の実現リターン。将来の年次リターンを予測するものではありません。</div>
-    <div class="chart-wrap" style="height:180px;"><canvas id="yearlyChart"></canvas></div>
+    <div class="chart-wrap" style="height:210px;"><canvas id="yearlyChart"></canvas></div>
       </div>
     </div>
     <script>
@@ -338,26 +338,57 @@ def _render_client_view(
       y:{{ticks:{{color:"#33465e",font:{{size:13}},callback:function(v){{return v.toFixed(2);}}}},grid:{{color:"rgba(30,60,120,0.07)"}}}}
     }}
       }}}});
+      // ── 棒グラフ上にアノテーションを描画するインラインプラグイン ──
+      var barLabelPlugin = {{
+        id: "barLabel",
+        afterDatasetsDraw: function(chart) {{
+          var ctx = chart.ctx;
+          var ds  = chart.data.datasets[0];
+          var meta= chart.getDatasetMeta(0);
+          ctx.save();
+          ctx.font = "bold 12px 'Noto Sans JP',sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          meta.data.forEach(function(bar, i) {{
+            var v   = ds.data[i];
+            var lbl = (v >= 0 ? "+" : "") + v.toFixed(1) + "%";
+            var clr = v >= 0 ? "{_color_hex}" : "#9b2c2c";
+            var x   = bar.x;
+            var pad = 6;
+            // プラスは棒の上、マイナスは棒の下に配置
+            var y   = v >= 0 ? bar.y - pad : bar.y + pad;
+            ctx.fillStyle = clr;
+            ctx.fillText(lbl, x, y);
+          }});
+          ctx.restore();
+        }}
+      }};
       var ctx2=document.getElementById("yearlyChart").getContext("2d");
-      new Chart(ctx2,{{type:"bar",data:{{labels:yYears,datasets:[{{
-    label:"年次リターン（実績）",data:yVals,
-    backgroundColor:yVals.map(function(v){{return v>=0?colorBg:"rgba(217,64,48,0.12)"}}),
-    borderColor:yVals.map(function(v){{return v>=0?color:"#9b2c2c"}}),
-    borderWidth:2,borderRadius:4
-      }}]}},options:{{
-    responsive:true,maintainAspectRatio:false,animation:{{duration:500}},
-    plugins:{{
-      legend:{{display:false}},
-      tooltip:{{backgroundColor:"#fff",borderColor:color,borderWidth:1,
-        titleColor:"#1A2540",bodyColor:"#4A5E7A",
-        callbacks:{{label:function(c){{return" "+c.parsed.y.toFixed(2)+"%";}}}}
-      }}
-    }},
-    scales:{{
-      x:{{ticks:{{color:"#33465e",font:{{size:16}}}},grid:{{display:false}}}},
-      y:{{ticks:{{color:"#33465e",font:{{size:13}},callback:function(v){{return v.toFixed(1)+"%";}}}},grid:{{color:"rgba(30,60,120,0.07)"}}}}
-    }}
-      }}}});
+      new Chart(ctx2,{{
+        type:"bar",
+        data:{{labels:yYears,datasets:[{{
+          label:"年次リターン（実績）",data:yVals,
+          backgroundColor:yVals.map(function(v){{return v>=0?colorBg:"rgba(217,64,48,0.12)"}}),
+          borderColor:yVals.map(function(v){{return v>=0?color:"#9b2c2c"}}),
+          borderWidth:2,borderRadius:4
+        }}]}},
+        options:{{
+          responsive:true,maintainAspectRatio:false,animation:{{duration:500}},
+          layout:{{padding:{{top:22,bottom:4}}}},
+          plugins:{{
+            legend:{{display:false}},
+            tooltip:{{backgroundColor:"#fff",borderColor:color,borderWidth:1,
+              titleColor:"#1A2540",bodyColor:"#4A5E7A",
+              callbacks:{{label:function(c){{return" "+c.parsed.y.toFixed(2)+"%";}}}}
+            }}
+          }},
+          scales:{{
+            x:{{ticks:{{color:"#33465e",font:{{size:16}}}},grid:{{display:false}}}},
+            y:{{ticks:{{color:"#33465e",font:{{size:13}},callback:function(v){{return v.toFixed(1)+"%";}}}},grid:{{color:"rgba(30,60,120,0.07)"}}}}
+          }}
+        }},
+        plugins:[barLabelPlugin]
+      }});
     }})();
     </script>
     </body>
@@ -1489,7 +1520,7 @@ body{{background:#F4F6F9;color:#1A2540;font-family:'Noto Sans JP',sans-serif;fon
   <div class="card">
     <div class="card-title">年次リターン（棒グラフ）<span style="margin-left:8px;background:rgba(122,92,30,0.08);border:1px solid rgba(122,92,30,0.22);border-radius:3px;padding:1px 7px;font-size:15px;color:#7A5C1E;letter-spacing:0.06em;">過去実績</span></div>
     <div class="card-sub">各暦年の実現リターン。将来の年次リターンを予測するものではありません。</div>
-    <div class="chart-wrap" style="height:160px;"><canvas id="yearlyChart_{_uid}"></canvas></div>
+    <div class="chart-wrap" style="height:190px;"><canvas id="yearlyChart_{_uid}"></canvas></div>
   </div>
 </div>
 
@@ -1562,27 +1593,57 @@ body{{background:#F4F6F9;color:#1A2540;font-family:'Noto Sans JP',sans-serif;fon
     }}
   }}}});
 
+  // ── 棒グラフ上にアノテーションを描画するインラインプラグイン ──
+  var barLabelPlugin_{_uid} = {{
+    id: "barLabel_{_uid}",
+    afterDatasetsDraw: function(chart) {{
+      var ctx = chart.ctx;
+      var ds  = chart.data.datasets[0];
+      var meta= chart.getDatasetMeta(0);
+      ctx.save();
+      ctx.font = "bold 11px 'Noto Sans JP',sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      meta.data.forEach(function(bar, i) {{
+        var v   = ds.data[i];
+        var lbl = (v >= 0 ? "+" : "") + v.toFixed(1) + "%";
+        var clr = v >= 0 ? "{_c}" : "#9b2c2c";
+        var pad = 6;
+        var y   = v >= 0 ? bar.y - pad : bar.y + pad;
+        ctx.fillStyle = clr;
+        ctx.fillText(lbl, bar.x, y);
+      }});
+      ctx.restore();
+    }}
+  }};
+
   // ── Chart 3: 年次リターン棒グラフ ───────────────────
   var ctx3=document.getElementById("yearlyChart_{_uid}").getContext("2d");
-  new Chart(ctx3,{{type:"bar",data:{{labels:yYears,datasets:[
-    {{label:"年次リターン（実績）",data:yVals,
-      backgroundColor:yVals.map(function(v){{return v>=0?color+"28":"rgba(217,64,48,0.12)"}}),
-      borderColor:yVals.map(function(v){{return v>=0?color:"#9b2c2c"}}),
-      borderWidth:2,borderRadius:4}}
-  ]}},options:{{
-    responsive:true,maintainAspectRatio:false,animation:{{duration:400}},
-    plugins:{{
-      legend:{{display:false}},
-      tooltip:{{backgroundColor:"#fff",borderColor:color,borderWidth:1,
-        titleColor:"#1A2540",bodyColor:"#4A5E7A",
-        callbacks:{{label:function(c){{return" "+c.parsed.y.toFixed(2)+"%";}}}}
+  new Chart(ctx3,{{
+    type:"bar",
+    data:{{labels:yYears,datasets:[
+      {{label:"年次リターン（実績）",data:yVals,
+        backgroundColor:yVals.map(function(v){{return v>=0?color+"28":"rgba(217,64,48,0.12)"}}),
+        borderColor:yVals.map(function(v){{return v>=0?color:"#9b2c2c"}}),
+        borderWidth:2,borderRadius:4}}
+    ]}},
+    options:{{
+      responsive:true,maintainAspectRatio:false,animation:{{duration:400}},
+      layout:{{padding:{{top:22,bottom:4}}}},
+      plugins:{{
+        legend:{{display:false}},
+        tooltip:{{backgroundColor:"#fff",borderColor:color,borderWidth:1,
+          titleColor:"#1A2540",bodyColor:"#4A5E7A",
+          callbacks:{{label:function(c){{return" "+c.parsed.y.toFixed(2)+"%";}}}}
+        }}
+      }},
+      scales:{{
+        x:{{ticks:{{color:"#33465e",font:{{size:16}}}},grid:{{display:false}}}},
+        y:{{ticks:{{color:"#33465e",font:{{size:13}},callback:function(v){{return v.toFixed(1)+"%";}}}},grid:{{color:"rgba(30,60,120,0.07)"}}}}
       }}
     }},
-    scales:{{
-      x:{{ticks:{{color:"#33465e",font:{{size:16}}}},grid:{{display:false}}}},
-      y:{{ticks:{{color:"#33465e",font:{{size:13}},callback:function(v){{return v.toFixed(1)+"%";}}}},grid:{{color:"rgba(30,60,120,0.07)"}}}}
-    }}
-  }}}});
+    plugins:[barLabelPlugin_{_uid}]
+  }});
 }})();
 </script>
 </body>
