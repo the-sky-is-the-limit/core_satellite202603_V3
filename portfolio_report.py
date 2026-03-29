@@ -41,8 +41,8 @@ _PROFILE_META = {
     "バランス型":     {"color": "#2f855a", "grad": "linear-gradient(135deg,#2f855a,#236644)", "label_en": "Balanced",     "icon": "◆"},
     "やや保守型":     {"color": "#2b6cb0", "grad": "linear-gradient(135deg,#2b6cb0,#1e4f8a)", "label_en": "Moderate",     "icon": "▼"},
     "保守型":         {"color": "#2c5282", "grad": "linear-gradient(135deg,#2c5282,#1e3a63)", "label_en": "Conservative", "icon": "▼▼"},
-    "リスクパリティ": {"color": "#6366f1", "grad": "linear-gradient(135deg,#4338ca,#6366f1)", "label_en": "Risk Parity",  "icon": "⚖"},
-    "テールリスク最小型": {"color": "#553c9a", "grad": "linear-gradient(135deg,#44337a,#6b46c1)", "label_en": "Tail-Risk Min", "icon": "🛡"},
+    "リスクパリティ": {"color": "#6366f1", "grad": "linear-gradient(135deg,#4338ca,#6366f1)", "label_en": "Risk Parity",  "icon": ""},
+    "テールリスク最小型": {"color": "#553c9a", "grad": "linear-gradient(135deg,#44337a,#6b46c1)", "label_en": "Tail-Risk Min", "icon": ""},
 }
 
 # ── 標準5プロファイル定数（比較テーブル・カード等で使用） ─────
@@ -433,7 +433,7 @@ def render_report_panel(
     # ── 統合レポートパネル出力 ─────────────────────────────────────
     st.markdown(
         f'<div class="report-panel-header">'
-        f'<div class="report-panel-icon">📊</div>'
+        f'<div class="report-panel-icon">■</div>'
         f'<div>'
         f'<div class="report-panel-title">5プロファイル 比較分析レポート</div>'
         f'<div class="report-panel-meta">'
@@ -450,9 +450,9 @@ def render_report_panel(
     )
 
     _rpt_tab1, _rpt_tab2, _rpt_tab3 = st.tabs([
-        "📊　比較サマリー",
-        "📋　ファンド構成",
-        "📈　リスク・リターン分析",
+        "比較サマリー",
+        "ファンド構成",
+        "リスク・リターン分析",
     ])
 
     with _rpt_tab1:
@@ -584,9 +584,9 @@ def render_report_panel(
         st.markdown(
             '<div class="sr-legend-wrap">'
             '<span>シャープレシオの目安：</span>'
-            '<span class="sr-legend-chip" style="background:#e6f5ed;color:#1e7a4e;">🟢 1.0以上 ＝ 高効率</span>'
-            '<span class="sr-legend-chip" style="background:#fff3e0;color:#c96a1a;">🟠 0.5〜1.0 ＝ 標準的</span>'
-            '<span class="sr-legend-chip" style="background:#fde9e6;color:#c0392b;">🔴 0.5未満 ＝ 要確認</span>'
+            '<span class="sr-legend-chip" style="background:#e6f5ed;color:#1e7a4e;"><span style="color:#1e7a4e;">■</span> 1.0以上 ＝ 高効率</span>'
+            '<span class="sr-legend-chip" style="background:#fff3e0;color:#c96a1a;"><span style="color:#c96a1a;">■</span> 0.5〜1.0 ＝ 標準的</span>'
+            '<span class="sr-legend-chip" style="background:#fde9e6;color:#c0392b;"><span style="color:#c0392b;">■</span> 0.5未満 ＝ 要確認</span>'
             '</div>',
             unsafe_allow_html=True
         )
@@ -598,7 +598,7 @@ def render_report_panel(
                 '<div style="margin-top:16px;padding:6px 0 4px 0;'
                 'border-top:1px solid rgba(99,102,241,0.25);">'
                 '<span style="font-size:0.90rem;font-weight:800;letter-spacing:0.1em;'
-                'text-transform:uppercase;color:#6366f1;">⚖️ リスクパリティ配分（参考）</span>'
+                'text-transform:uppercase;color:#6366f1;">リスクパリティ配分（参考）</span>'
                 '<span style="font-size:0.75rem;color:#64748b;margin-left:8px;">'
                 'サテライトのリスク寄与を均等化した配分 / テールリスク最小型（CVaR最小化）</span>'
                 '</div>',
@@ -749,14 +749,14 @@ def render_report_panel(
                     unsafe_allow_html=True,
                 )
                 st.caption(
-                    "⚖️ **リスクパリティ**：各サテライトのリスク寄与（RC）が均等になるよう配分。「リスク寄与CV」が0%に近いほど均等。"
-                    "　🛡️ **テールリスク最小型**：CVaR（ワースト5%月の平均損失）を直接最小化。正規分布を前提としないためヘッジファンド特有の"
+                    "**リスクパリティ**：各サテライトのリスク寄与（RC）が均等になるよう配分。「リスク寄与CV」が0%に近いほど均等。"
+                    "　**テールリスク最小型**：CVaR（ワースト5%月の平均損失）を直接最小化。正規分布を前提としないためヘッジファンド特有の"
                     "ファットテール・左歪み分布に対応。超保守クライアント向けの参考値としてご活用ください。"
                 )
 
         # ─── 詳細メトリクスバッジ（全5プロファイル・サイドバーチェックで制御）──
         if st.session_state.get('show_profile_metrics', False):
-            st.markdown('<div class="section-header">📐 全プロファイル 詳細指標</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">全プロファイル 詳細指標</div>', unsafe_allow_html=True)
             for pname in profile_order_list:
                 pf   = portfolios[pname]
                 st_  = pf["stats"]
@@ -814,15 +814,15 @@ def render_report_panel(
                 use_container_width=True,
                 hide_index=True,
             )
-            _cmp_caption = "💡 年率リターン・最大DD はCAGRベース。シャープ・ソルティノ・カルマーは高いほど優秀。　コア比率はポートフォリオ内のコアファンド比率。"
+            _cmp_caption = "年率リターン・最大DD はCAGRベース。シャープ・ソルティノ・カルマーは高いほど優秀。　コア比率はポートフォリオ内のコアファンド比率。"
             if _show_rp:
-                _cmp_caption += "　⚖️リスクパリティ・🛡テールリスク最小型はサイドバーチェックON時に追加表示される参考プロファイルです。"
+                _cmp_caption += "　リスクパリティ・テールリスク最小型はサイドバーチェックON時に追加表示される参考プロファイルです。"
             st.caption(_cmp_caption)
 
     with _rpt_tab2:
         st.markdown(
             f'<div class="core-bar">'
-            f'<span class="core-bar-label">⭐ コアファンド</span>'
+            f'<span class="core-bar-label">コアファンド</span>'
             f'<span class="core-bar-name">{core_fund}</span>'
             f'<span class="core-bar-item">（全プロファイル共通）</span>'
             f'</div>',
@@ -1018,7 +1018,7 @@ def render_report_panel(
 
         # [Fix A] _styled_summ を構築して st.dataframe に渡す。
         # 旧実装は _styled_summ を生成後に _summ_df（生 DataFrame）を渡していたため、
-        # キャプションに記載した色分け（緑/赤/🟢🟡🔴）が画面に反映されていなかった。
+        # キャプションに記載した色分け（緑/赤/■凡例）が画面に反映されていなかった。
         # Styler を直接渡す場合は column_config と併用不可のため、
         # フォーマットは Styler の .format() で完結させる。
         # （_disp_cols / _col_cfg は Styler 渡しに切り替えたため不要となり削除）
@@ -1052,11 +1052,11 @@ def render_report_panel(
             use_container_width=True,
         )
         st.caption(
-            f"🔵 コアファンド「{core_fund}」行は青ハイライト。"
+            f"コアファンド「{core_fund}」行は青ハイライト。"
             "　リターン: +10%超=濃緑 / +3〜10%=緑 / 0〜3%=薄緑 / マイナス=赤。"
-            "　シャープ: 🟢1.0超 / 🟡0.5-1.0 / 🔴0.5未満。"
-            "　最大DD: 🟢-10%以内 / 🟡-10〜-25% / 🔴-25%超。"
-            "　コア相関: 🟢0.3-0.7=分散◎ / 🟡0.7-0.9=やや高 / 🔴0.9超=高相関 / 灰=低相関。"
+            "　シャープ: <span style="color:#1e7a4e;">■</span>1.0超 / <span style="color:#d4a017;">■</span>0.5-1.0 / <span style="color:#c0392b;">■</span>0.5未満。"
+            "　最大DD: <span style="color:#1e7a4e;">■</span>-10%以内 / <span style="color:#d4a017;">■</span>-10〜-25% / <span style="color:#c0392b;">■</span>-25%超。"
+            "　コア相関: <span style="color:#1e7a4e;">■</span>0.3-0.7=分散◎ / <span style="color:#d4a017;">■</span>0.7-0.9=やや高 / <span style="color:#c0392b;">■</span>0.9超=高相関 / 灰=低相関。"
             "　列ヘッダーをクリックで昇順/降順ソートが可能（数値として正しく並び替え）。"
         )
     with _rpt_tab3:
@@ -1197,10 +1197,10 @@ def render_report_panel(
                 )
             bars_html += (
                 '<div class="sr-note">'
-                '💡 <b>シャープレシオの目安</b><br>'
-                '🟢 1.0以上 ＝ 優秀（リスク効率が高い）<br>'
-                '🟠 0.5〜1.0 ＝ 普通<br>'
-                '🔴 0.5未満 ＝ 要改善<br><br>'
+                '<b>シャープレシオの目安</b><br>'
+                '<span style="color:#1e7a4e;">■</span> 1.0以上 ＝ 優秀（リスク効率が高い）<br>'
+                '<span style="color:#c96a1a;">■</span> 0.5〜1.0 ＝ 普通<br>'
+                '<span style="color:#c0392b;">■</span> 0.5未満 ＝ 要改善<br><br>'
                 '国内株式インデックスの長期平均：約0.4〜0.6'
                 '</div>'
             )
