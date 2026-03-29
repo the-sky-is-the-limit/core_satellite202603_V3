@@ -359,20 +359,17 @@ def _render_client_view(
       <div class="mc" style="border-top:2px solid {_tret_col};">
     <div class="lbl">累積リターン</div>
     <div class="val" style="color:{_tret_col};">{_tret_sign}{_total_ret:.2f}<span class="unit">%</span></div>
-    <div class="note">分析期間全体（設定来ベース）</div>
-    <div class="warn">⚑ 過去の実績値</div>
+    <div class="note">分析期間：{_period_start}〜{_period_end}</div>
       </div>
       <div class="mc" style="border-top:2px solid {_ret_col};">
-    <div class="lbl">年率リターン (CAGR)</div>
+    <div class="lbl">年平均リターン (複利)</div>
     <div class="val" style="color:{_ret_col};">{_ret_sign}{_ann_ret:.2f}<span class="unit">%</span></div>
-    <div class="note">幾何平均・複利計算ベース</div>
-    <div class="warn">⚑ 過去の実績値</div>
+    <div class="note">分析期間：{_period_start}〜{_period_end}</div>
       </div>
       <div class="mc" style="border-top:2px solid {_color_hex};">
-    <div class="lbl">年率ボラティリティ</div>
+    <div class="lbl">年率価格変動リスク</div>
     <div class="val" style="color:{_color_hex};">{_vol:.2f}<span class="unit">%</span></div>
-    <div class="note">月次標準偏差を年率換算</div>
-    <div class="warn">⚑ 過去の変動幅</div>
+    <div class="note">下落だけでなく、リターンの上下のばらつきの大きさを示す指標</div>
       </div>
       <div class="mc" style="border-top:2px solid {_sr_col};">
     <div class="lbl">シャープレシオ</div>
@@ -548,9 +545,9 @@ def _render_tab_performance(
     with col1:
         st.metric("累積リターン（実績）", f"{total_return:.2f}%")
     with col2:
-        st.metric("年率リターン（実績）", f"{selected_stats['年率リターン']*100:.2f}%")
+        st.metric("年平均リターン（実績）", f"{selected_stats['年率リターン']*100:.2f}%")
     with col3:
-        st.metric("年平均リスク（実績）", f"{selected_stats['年率ボラティリティ']*100:.2f}%")
+        st.metric("年率価格変動リスク（実績）", f"{selected_stats['年率ボラティリティ']*100:.2f}%")
     with col4:
         st.metric("シャープレシオ", f"{selected_stats['シャープレシオ']:.3f}")
     with col5:
@@ -729,8 +726,8 @@ def _render_tab_allocation(
     weights_df = pd.DataFrame({
         'ファンド': selected_funds,
         '比重(%)': selected_weights * 100,
-        '年率リターン(%)': [fund_stats.loc[f, '年率リターン'] * 100 for f in selected_funds],
-        '年平均リスク(%)': [fund_stats.loc[f, '年率ボラ'] * 100 for f in selected_funds],
+        '年平均リターン(%)': [fund_stats.loc[f, '年率リターン'] * 100 for f in selected_funds],
+        '年率価格変動リスク(%)': [fund_stats.loc[f, '年率ボラ'] * 100 for f in selected_funds],
         'シャープレシオ': [fund_stats.loc[f, 'シャープレシオ'] for f in selected_funds]
     })
     weights_df = weights_df[weights_df['比重(%)'] > 1.0].sort_values('比重(%)', ascending=False)
@@ -839,7 +836,7 @@ def _render_tab_risk(
                   help="全期間のドローダウン二乗平均平方根。低いほど「深く長い」DDが少ない。")
     with col7:
         st.metric("Martin比率", f"{_martin_port:.3f}",
-                  help="年率リターン÷Ulcer指数。カルマー比率のUlcer版。高いほど優秀。")
+                  help="年平均リターン÷Ulcer指数。カルマー比率のUlcer版。高いほど優秀。")
     with col8:
         st.metric("GL比率", f"{_gl_port:.3f}",
                   help="平均利益÷平均損失の絶対値。1.0超で利益が損失を上回る。売りオプション系は0.2前後に低下。")
@@ -1227,7 +1224,7 @@ def _render_tab_constituents(
                     },
                     {
                         "指標": "価格変動リスク",
-                        "説明": "年率ボラティリティ（低いほど安定）",
+                        "説明": "年率価格変動リスク（低いほど安定）",
                         fund_name_short: fund_metrics["価格変動リスク"],
                         _bname: bench_metrics.get("価格変動リスク", "-"),
                     },
@@ -1360,9 +1357,9 @@ def _render_tab_constituents(
                 with col1:
                     st.metric("設定来リターン", f"{total_return_fund:.1f}%")
                 with col2:
-                    st.metric("年率リターン", f"{annual_return_fund:.1f}%")
+                    st.metric("年平均リターン", f"{annual_return_fund:.1f}%")
                 with col3:
-                    st.metric("年平均リスク", f"{annual_vol_fund:.1f}%")
+                    st.metric("年率価格変動リスク", f"{annual_vol_fund:.1f}%")
                 with col4:
                     st.metric("データ期間", f"{len(fund_prices_full)}ヶ月")
 
@@ -1574,20 +1571,17 @@ body{{background:#F4F6F9;color:#1A2540;font-family:'Noto Sans JP',sans-serif;fon
   <div class="mc" style="border-top:2px solid {_tret_col};">
     <div class="lbl">累積リターン</div>
     <div class="val" style="color:{_tret_col};">{_tret_sign}{_total_ret:.2f}<span class="unit">%</span></div>
-    <div class="note">分析期間合計（過去実績）</div>
-    <div class="warn">⚑ 過去の実績値</div>
+    <div class="note">分析期間：{period_start}〜{period_end}</div>
   </div>
   <div class="mc" style="border-top:2px solid {_ret_col};">
-    <div class="lbl">年率リターン</div>
+    <div class="lbl">年平均リターン (複利)</div>
     <div class="val" style="color:{_ret_col};">{_ret_sign}{_ann_ret:.2f}<span class="unit">%</span></div>
-    <div class="note">幾何平均・複利計算ベース</div>
-    <div class="warn">⚑ 過去の実績値</div>
+    <div class="note">分析期間：{period_start}〜{period_end}</div>
   </div>
   <div class="mc" style="border-top:2px solid {_c};">
-    <div class="lbl">年率ボラティリティ</div>
+    <div class="lbl">年率価格変動リスク</div>
     <div class="val" style="color:{_c};">{_vol:.2f}<span class="unit">%</span></div>
-    <div class="note">月次標準偏差を年率換算</div>
-    <div class="warn">⚑ 過去の変動幅</div>
+    <div class="note">下落だけでなく、リターンの上下のばらつきの大きさを示す指標</div>
   </div>
   <div class="mc" style="border-top:2px solid {_sr_col};">
     <div class="lbl">シャープレシオ</div>
