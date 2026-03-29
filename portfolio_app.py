@@ -846,6 +846,14 @@ if uploaded_file is not None:
         _rf_rate_param_early = st.session_state.get('_rf_rate_slider', 0.5)
         rf_rate_annual        = _rf_rate_param_early / 100.0
         st.session_state['rf_rate'] = rf_rate_annual
+        # [FIX-MEDIUM-Ph4-3] rf_rate の "1 run behind" 非対称性を明記。
+        # この時点の rf_rate_annual は「前回 run でユーザーが設定した値」を使う。
+        # その後 L924 でスライダーを描画し rf_rate_annual を「今回の値」で上書きするため、
+        #   overview_raw（↓ L852 で計算）: 前回値を使用（1 run 遅れ）
+        #   optimize_portfolios（L1409 で計算）: 今回の値を使用（最新）
+        # という非対称が生じる。初回起動時は両方ともデフォルト 0.5% なので実害なし。
+        # 意図的な設計であり、「概観テーブルが 1 クリック古い金利で計算されることがある」点を
+        # 把握したうえで変更する際は BUG-E / ISSUE-7 の経緯コメントも参照すること。
 
         with st.spinner("サマリーテーブルを計算中..."):
             _cache_key = build_overview_cache_key(df_price, months_param, rf_rate_annual)
@@ -1026,7 +1034,15 @@ if uploaded_file is not None:
                     column_config=make_overview_col_config(_perf_df.columns),
                     use_container_width=True, height=400,
                 )
-                st.caption("列ヘッダークリックでソート可。年平均リターン（複利）表示。コアファンド行は凡例のみ（ハイライトは選定後）")
+                # [FIX-MEDIUM-Ph4-2] 概観テーブルは欠損率 < 20% のファンドを表示するが、
+                # 実際の最適化は欠損率 = 0%（選択期間内に欠損なし）のファンドのみを使う。
+                # 両者の対象範囲が異なることをユーザーに明示する注記を caption に追加する。
+                st.caption(
+                    "列ヘッダークリックでソート可。年平均リターン（複利）表示。"
+                    "コアファンド行は凡例のみ（ハイライトは選定後）。"
+                    "　※ このテーブルは欠損率 20% 未満のファンドを表示。"
+                    "分析実行時は選択期間内で欠損のないファンドのみが最適化の対象になります。"
+                )
 
             with tab_risk:
                 _risk_cols  = ['データ期間(年)', '設定来リターン(年率)', '設定来ボラ',
@@ -1038,7 +1054,10 @@ if uploaded_file is not None:
                     column_config=make_overview_col_config(_risk_df.columns),
                     use_container_width=True, height=400,
                 )
-                st.caption("列ヘッダークリックでソート可。最大DD：-10%以内が理想、-25%超は要注意。シャープ：1.0超が優秀。")
+                st.caption(
+                    "列ヘッダークリックでソート可。最大DD：-10%以内が理想、-25%超は要注意。シャープ：1.0超が優秀。"
+                    "　※ 欠損率 20% 未満のファンドを表示（分析対象は欠損なしのファンドのみ）。"
+                )
 
             with tab_corr:
                 _corr_cols  = ['データ期間(年)', '設定来リターン(年率)', '設定来ボラ',
