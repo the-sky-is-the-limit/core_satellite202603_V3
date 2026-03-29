@@ -44,7 +44,7 @@ st.markdown("""
         background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1f4e79 100%);
         padding: 22px 32px 18px;
         border-bottom: 3px solid #b3904a;
-        margin: -1rem -2.5vw 1.38rem -2.5vw;
+        margin: -1rem -1.5vw 1.38rem -1.5vw;
         color: #fff;
     }
     .hfd-header-eyebrow {
@@ -610,14 +610,14 @@ st.markdown("""
 
     /* ── レイアウト幅制御 ── */
     /* Streamlit layout="wide" は block-container にインラインで max-width を設定する。
-       これを none で解除し、左右 2.5vw の padding でコンテンツ幅を約95%に制御。
+       これを none で解除し、左右 1.5vw の padding でコンテンツ幅を約97%に制御。
        ヘッダー（.hfd-header）はネガティブマージンで全幅を維持する。
-       レポートパネルは st.columns([1,16,1]) で約85%幅に調整済み。 */
+       レポートパネルは st.columns([1,18,1]) で約90%幅に調整済み。 */
     .main .block-container {
         max-width: none !important;
         width: 100% !important;
-        padding-left: 2.5vw !important;
-        padding-right: 2.5vw !important;
+        padding-left: 1.5vw !important;
+        padding-right: 1.5vw !important;
         padding-top: 1rem !important;
     }
 
@@ -717,10 +717,10 @@ if uploaded_file is not None:
     fund_cols = [col for col in df_price.columns 
                  if not any(curr in col for curr in CURRENCY_KEYWORDS)]
     
-    # ─── コンテンツ全体を85%幅コンテナで表示（レイアウト側でサイズ制御）────
-    # [WIDTH修正] [1,8,1] → [1,16,1]: 中央比率を拡大し、左右余白を縮小。
-    # block-container の padding も 7.5vw → 2.5vw に合わせて変更済み。
-    _main_left, _main_col, _main_right = st.columns([1, 16, 1])
+    # ─── コンテンツ全体を90%幅コンテナで表示（レイアウト側でサイズ制御）────
+    # [WIDTH修正] [1,16,1] → [1,18,1]: 中央比率を拡大し、左右余白を最小化。
+    # block-container の padding も 2.5vw → 1.5vw に合わせて変更済み。
+    _main_left, _main_col, _main_right = st.columns([1, 18, 1])
     with _main_col:
         st.markdown(
             f'<div style="background:linear-gradient(135deg,#ecfdf5,#d1fae5);border:1px solid #6ee7b7;'
