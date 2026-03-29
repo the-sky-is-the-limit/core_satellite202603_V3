@@ -971,86 +971,112 @@ def render_report_panel(
             _summ_df[~_summ_df['_is_core']].sort_values('_ret_sort', ascending=False)
         ]).drop(columns=['_ret_sort', '_is_core'])
 
-        # ── 条件付き色分け（数値で比較） ─────────────────────────
-        def _sc_row(row):
-            if row.name == core_fund:
-                return ['background-color: #dbeafe; font-weight: bold'] * len(row)
-            return [''] * len(row)
+        # [Fix B] HTMLテーブル方式に切り替えたため旧Styler関数は不要
 
-        def _sc_ret(col):
-            out = []
-            for v in col:
-                if pd.isna(v):       out.append('')
-                elif v >= 10:        out.append('background-color: #86efac')
-                elif v >= 3:         out.append('background-color: #bbf7d0')
-                elif v >= 0:         out.append('background-color: #dcfce7')
-                elif v >= -5:        out.append('background-color: #fee2e2')
-                else:                out.append('background-color: #fca5a5')
-            return out
+        # [Fix B] st.dataframe の Styler では列ヘッダーの white-space: pre-line が
+        # Streamlit AgGrid 上で無視されスクロールが発生する。
+        # HTMLテーブルを st.markdown で直接描画することで列名折り返しを確実に実現する。
 
-        def _sc_sharpe(col):
-            out = []
-            for v in col:
-                if pd.isna(v):      out.append('')
-                elif v >= 1.0:      out.append('background-color: #bbf7d0')
-                elif v >= 0.5:      out.append('background-color: #fef9c3')
-                else:               out.append('background-color: #fee2e2')
-            return out
+        # ── フォーマット関数 ─────────────────────────────────────
+        def _fmt_ret(v):
+            return f"{v:+.1f}%" if pd.notna(v) else "—"
+        def _fmt_vol(v):
+            return f"{v:.1f}%" if pd.notna(v) else "—"
+        def _fmt_sr(v):
+            return f"{v:.2f}" if pd.notna(v) else "—"
+        def _fmt_dd(v):
+            return f"{v:.1f}%" if pd.notna(v) else "—"
+        def _fmt_corr(v):
+            return f"{v:.2f}" if pd.notna(v) else "—"
+        def _fmt_wr(v):
+            return f"{v:.0f}%" if pd.notna(v) else "—"
 
-        def _sc_dd(col):
-            out = []
-            for v in col:
-                if pd.isna(v):      out.append('')
-                elif v > -10:       out.append('background-color: #bbf7d0')
-                elif v > -25:       out.append('background-color: #fef9c3')
-                else:               out.append('background-color: #fee2e2')
-            return out
+        # ── セル背景色 ─────────────────────────────────────────
+        def _bg_ret(v):
+            if pd.isna(v): return ''
+            if v >= 10:    return '#86efac'
+            if v >= 3:     return '#bbf7d0'
+            if v >= 0:     return '#dcfce7'
+            if v >= -5:    return '#fee2e2'
+            return '#fca5a5'
+        def _bg_sr(v):
+            if pd.isna(v): return ''
+            if v >= 1.0:   return '#bbf7d0'
+            if v >= 0.5:   return '#fef9c3'
+            return '#fee2e2'
+        def _bg_dd(v):
+            if pd.isna(v): return ''
+            if v > -10:    return '#bbf7d0'
+            if v > -25:    return '#fef9c3'
+            return '#fee2e2'
+        def _bg_corr(v):
+            if pd.isna(v):          return ''
+            if 0.3 <= v <= 0.7:     return '#bbf7d0'
+            if 0.7 < v <= 0.9:      return '#fef9c3'
+            if v > 0.9:             return '#fca5a5'
+            return '#f3f4f6'
 
-        def _sc_corr(col):
-            out = []
-            for v in col:
-                if pd.isna(v):              out.append('')
-                elif 0.3 <= v <= 0.7:       out.append('background-color: #bbf7d0')
-                elif 0.7 < v <= 0.9:        out.append('background-color: #fef9c3')
-                elif v > 0.9:               out.append('background-color: #fca5a5')
-                else:                       out.append('background-color: #f3f4f6')
-            return out
+        # ── 列定義：(DataFrame列名, 表示ヘッダー(HTMLで<br>折り返し), fmt関数, bg関数) ──
+        _col_defs = [
+            ('リターン\n分析期間(%)',  'リターン<br>分析期間(%)',  _fmt_ret,  _bg_ret),
+            ('リターン\n設定来(%)',    'リターン<br>設定来(%)',    _fmt_ret,  _bg_ret),
+            ('年率リスク\n分析期間(%)', '年率リスク<br>分析期間(%)', _fmt_vol, None),
+            ('シャープ\n分析期間',     'シャープ<br>分析期間',     _fmt_sr,   _bg_sr),
+            ('最大DD\n設定来(%)',      '最大DD<br>設定来(%)',      _fmt_dd,   _bg_dd),
+            ('コア相関\n分析期間',     'コア相関<br>分析期間',     _fmt_corr, _bg_corr),
+            ('月次勝率\n設定来(%)',    '月次勝率<br>設定来(%)',    _fmt_wr,   None),
+        ]
 
-        # [Fix A] _styled_summ を構築して st.dataframe に渡す。
-        # 旧実装は _styled_summ を生成後に _summ_df（生 DataFrame）を渡していたため、
-        # キャプションに記載した色分け（緑/赤/■凡例）が画面に反映されていなかった。
-        # Styler を直接渡す場合は column_config と併用不可のため、
-        # フォーマットは Styler の .format() で完結させる。
-        # （_disp_cols / _col_cfg は Styler 渡しに切り替えたため不要となり削除）
-        _styled_summ = (
-            _summ_df.style
-            .apply(_sc_row, axis=1)
-            .apply(_sc_ret,    subset=['リターン\n分析期間(%)', 'リターン\n設定来(%)'])
-            .apply(_sc_sharpe, subset=['シャープ\n分析期間'])
-            .apply(_sc_dd,     subset=['最大DD\n設定来(%)'])
-            .apply(_sc_corr,   subset=['コア相関\n分析期間'])
-            .format({
-                'リターン\n分析期間(%)' : lambda v: f"{v:+.1f}%" if pd.notna(v) else "—",
-                'リターン\n設定来(%)'   : lambda v: f"{v:+.1f}%" if pd.notna(v) else "—",
-                '年率リスク\n分析期間(%)': lambda v: f"{v:.1f}%"  if pd.notna(v) else "—",
-                'シャープ\n分析期間'    : lambda v: f"{v:.2f}"    if pd.notna(v) else "—",
-                '最大DD\n設定来(%)'     : lambda v: f"{v:.1f}%"   if pd.notna(v) else "—",
-                'コア相関\n分析期間'    : lambda v: f"{v:.2f}"    if pd.notna(v) else "—",
-                '月次勝率\n設定来(%)'   : lambda v: f"{v:.0f}%"   if pd.notna(v) else "—",
-            })
-            .set_properties(**{'text-align': 'center', 'font-size': '0.94em', 'padding': '3px 6px'})
-            .set_table_styles([
-                {'selector': 'th.col_heading',
-                 'props': 'text-align: center; font-size: 0.92em; white-space: pre-line; padding: 4px 6px;'},
-                {'selector': 'th.row_heading',
-                 'props': 'text-align: left; font-size: 0.92em;'},
-            ])
+        # ── HTMLテーブル生成 ────────────────────────────────────
+        _th_style = (
+            'background:#f1f5f9;color:#1e3a5f;font-weight:700;font-size:0.82rem;'
+            'text-align:center;padding:6px 8px;border:1px solid #e2e8f0;'
+            'white-space:normal;line-height:1.4;min-width:70px;'
+        )
+        _th_fund_style = (
+            'background:#f1f5f9;color:#1e3a5f;font-weight:700;font-size:0.82rem;'
+            'text-align:left;padding:6px 10px;border:1px solid #e2e8f0;'
+            'min-width:160px;'
         )
 
-        st.dataframe(
-            _styled_summ,
-            use_container_width=True,
+        _html_rows = []
+        # ヘッダー行
+        _header = f'<tr><th style="{_th_fund_style}">ファンド</th>'
+        for _, _hdr, _, _ in _col_defs:
+            _header += f'<th style="{_th_style}">{_hdr}</th>'
+        _header += '</tr>'
+        _html_rows.append(_header)
+
+        # データ行
+        for _fund_name, _row in _summ_df.iterrows():
+            _is_core = (_fund_name == core_fund)
+            _row_bg  = '#dbeafe' if _is_core else '#ffffff'
+            _row_fw  = 'bold'    if _is_core else 'normal'
+            _td_fund = (
+                f'<td style="background:{_row_bg};font-weight:{_row_fw};'
+                f'font-size:0.82rem;padding:4px 10px;border:1px solid #e2e8f0;'
+                f'white-space:nowrap;max-width:220px;overflow:hidden;'
+                f'text-overflow:ellipsis;">{_fund_name}</td>'
+            )
+            _tds = _td_fund
+            for _col, _, _fmt, _bg in _col_defs:
+                _val = _row.get(_col, np.nan)
+                _txt = _fmt(_val)
+                _cell_bg = _row_bg if _is_core else (_bg(_val) if _bg else '#ffffff')
+                _tds += (
+                    f'<td style="background:{_cell_bg};font-weight:{_row_fw};'
+                    f'font-size:0.85rem;text-align:center;padding:4px 8px;'
+                    f'border:1px solid #e2e8f0;">{_txt}</td>'
+                )
+            _html_rows.append(f'<tr>{_tds}</tr>')
+
+        _table_html = (
+            '<div style="overflow-x:auto;">'
+            '<table style="width:100%;border-collapse:collapse;font-family:sans-serif;">'
+            + ''.join(_html_rows)
+            + '</table></div>'
         )
+        st.markdown(_table_html, unsafe_allow_html=True)
         st.markdown(
             f'<div style="font-size:0.78rem;color:rgba(49,51,63,0.6);line-height:1.7;">'
             f'コアファンド「{core_fund}」行は青ハイライト。'
