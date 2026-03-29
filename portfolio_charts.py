@@ -499,7 +499,7 @@ def _render_tab_performance(
 
     # 構成ファンドの個別チャート
     st.markdown("### 構成ファンドの価格推移")
-    st.caption("💡 ポートフォリオを構成する各ファンドの価格推移（基準価格=100として正規化）")
+    st.caption("ポートフォリオを構成する各ファンドの価格推移（基準価格=100として正規化）")
 
     # 1%以上の比重を持つファンドのみ表示
     constituent_funds_charts = [selected_funds[i] for i, w in enumerate(selected_weights) if w > 0.01]
@@ -600,7 +600,7 @@ def _render_tab_allocation(
     st.dataframe(weights_df.round(3), use_container_width=True, hide_index=True)
 
     # コアファンドハイライト
-    st.info(f"🎯 コアファンド: **{core_fund}** ({selected_weights[core_idx]*100:.1f}%)")
+    st.info(f"コアファンド: **{core_fund}** ({selected_weights[core_idx]*100:.1f}%)")
 
 
 
@@ -916,7 +916,7 @@ def _render_tab_constituents(
 ):
     """Tab6：構成銘柄詳細分析（全期間データ使用・calculate_fund_metrics で統一）。"""
     st.markdown("### 構成銘柄詳細分析")
-    st.info("💡 ポートフォリオを構成する各ファンドについて、オリジナルデータ全期間での詳細分析を表示します")
+    st.info("ポートフォリオを構成する各ファンドについて、オリジナルデータ全期間での詳細分析を表示します")
 
     # [ISSUE-4修正] calc_annualized_return / color_returns を for ループ外（関数スコープ）に移動
     # 旧実装ではファンド数分（最大30本程度）のイテレーションごとに再定義されていた。
@@ -965,7 +965,7 @@ def _render_tab_constituents(
             )
             with st.expander(expander_label, expanded=(idx == 0)):
                 # ファンド名表示
-                st.markdown(f"#### 📊 {fund}")
+                st.markdown(f"#### {fund}")
                 st.markdown(f"**ポートフォリオ比重**: {weight*100:.2f}%")
 
                 # 全期間データを取得（欠損値を除外）
@@ -1111,7 +1111,7 @@ def _render_tab_constituents(
                 col1, col2 = st.columns(2)
 
                 with col1:
-                    st.markdown("##### 📊 リターン（年率）")
+                    st.markdown("##### リターン（年率）")
                     return_df = pd.DataFrame(return_data)
 
                     styled_return_df = return_df.style.map(
@@ -1126,7 +1126,7 @@ def _render_tab_constituents(
                     st.dataframe(risk_df, use_container_width=True, hide_index=True)
 
                 # パフォーマンス推移グラフ
-                st.markdown("##### 📈 パフォーマンス推移（指数化）")
+                st.markdown("##### パフォーマンス推移（指数化）")
 
                 # 指数化（開始時点=100）
                 fund_indexed = (fund_prices_full / fund_prices_full.iloc[0]) * 100
@@ -1184,7 +1184,7 @@ def _render_tab_constituents(
                 st.plotly_chart(fig_perf, use_container_width=True, key=f"{selected_profile}_fund_perf_{idx}")
 
                 # 統計サマリー
-                st.markdown("##### 📋 統計サマリー")
+                st.markdown("##### 統計サマリー")
 
                 col1, col2, col3, col4 = st.columns(4)
 
@@ -1605,7 +1605,7 @@ def render_fund_drill_section(
     profile_name: str = None,
     rf_rate: float = 0.0,   # [BUG-5修正] シャープ・ソルティノ計算用
 ):
-    """📊 構成ファンド 個別分析セクション。
+    """構成ファンド 個別分析セクション。
 
     Parameters
     ----------
@@ -1652,7 +1652,7 @@ def render_fund_drill_section(
 
     # ── セクションヘッダー ─────────────────────────────────────
     st.markdown(
-        f'<div class="section-header">📊 構成ファンド 個別分析'
+        f'<div class="section-header">構成ファンド 個別分析'
         f'<span style="font-size:0.83rem;font-weight:500;color:#64748b;margin-left:10px;">'
         f'{_sel_profile}　—　{len(_constituent)}本</span></div>',
         unsafe_allow_html=True,
@@ -1756,7 +1756,7 @@ def render_profile_detail(
             st.markdown(
                 '<p style="font-size:0.94rem;font-weight:500;color:#1e3a5f;'
                 'margin:6px 0 0;line-height:1.5;">'
-                '⚙️ 担当者モード　—　詳細指標・構成銘柄分析を含む全情報を表示しています</p>',
+                '担当者モード　—　詳細指標・構成銘柄分析を含む全情報を表示しています</p>',
                 unsafe_allow_html=True
             )
 
@@ -1767,12 +1767,12 @@ def render_profile_detail(
         tab1 = tab2 = tab3 = tab4 = tab5 = tab6 = None
     else:
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-            "📈 パフォーマンス",
+            "パフォーマンス",
             "🥧 構成",
-            "📊 リスク分析",
-            "🔗 相関分析",
+            "リスク分析",
+            "相関分析",
             "🎲 モンテカルロ",
-            "📋 構成銘柄分析"
+            "構成銘柄分析"
         ])
 
     # ── 顧客向け表示 ─────────────────────────────────────────
