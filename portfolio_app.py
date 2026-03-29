@@ -630,7 +630,7 @@ st.markdown("""
       <span style="background:linear-gradient(135deg,#b3904a,#8a6a30);color:#0f172a;
                    border-radius:4px;padding:2px 8px;font-size:0.65rem;font-weight:800;
                    letter-spacing:0.08em;flex-shrink:0;">STEP 1</span>
-      <span style="font-size:0.78rem;font-weight:700;color:#1e3a5f;">📂 データアップロード</span>
+      <span style="font-size:0.78rem;font-weight:700;color:#1e3a5f;">データアップロード</span>
     </div>
     <div style="font-size:0.65rem;color:#66788a;margin-top:3px;">月次基準価格 .xlsx</div>
   </div>
@@ -639,7 +639,7 @@ st.markdown("""
       <span style="background:linear-gradient(135deg,#b3904a,#8a6a30);color:#0f172a;
                    border-radius:4px;padding:2px 8px;font-size:0.65rem;font-weight:800;
                    letter-spacing:0.08em;flex-shrink:0;">STEP 2</span>
-      <span style="font-size:0.78rem;font-weight:700;color:#1e3a5f;">⚙️ 分析設定</span>
+      <span style="font-size:0.78rem;font-weight:700;color:#1e3a5f;">分析設定</span>
     </div>
     <div style="font-size:0.65rem;color:#66788a;margin-top:3px;">期間・ベンチマーク・コアファンド</div>
   </div>
@@ -740,7 +740,7 @@ if uploaded_file is not None:
                 margin:-1px -1px 0 -1px;">
       <div style="width:32px;height:32px;background:linear-gradient(135deg,#b3904a,#8a6a30);
                   border-radius:6px;display:flex;align-items:center;justify-content:center;
-                  font-size:16px;flex-shrink:0;box-shadow:0 2px 8px rgba(179,144,74,0.4);">⚙️</div>
+                  font-size:16px;flex-shrink:0;box-shadow:0 2px 8px rgba(179,144,74,0.4);">■</div>
       <div>
         <div style="font-size:0.9rem;font-weight:800;color:#d4af6a;letter-spacing:0.05em;
                     line-height:1.2;">分析設定</div>
@@ -863,13 +863,13 @@ if uploaded_file is not None:
         st.sidebar.markdown("""
     <div style="padding:4px 0 8px 0;">
       <div style="font-size:0.7rem;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;
-                  color:#b3904a;margin-bottom:2px;">🔍 詳細設定</div>
+                  color:#b3904a;margin-bottom:2px;">詳細設定</div>
       <div style="font-size:0.65rem;color:#66788a;">スクリーニング条件をカスタマイズ</div>
     </div>
     """, unsafe_allow_html=True)
         n_funds_final_param = st.sidebar.slider("最終選定ファンド数", 20, 40, 30, 1)
         
-        with st.sidebar.expander("⚙️ 高度なスクリーニング設定", expanded=False):
+        with st.sidebar.expander("高度なスクリーニング設定", expanded=False):
             st.markdown(
                 '<div style="font-size:0.68rem;color:#66788a;margin-bottom:8px;">'
                 '相関バケット別選定（v3.1）<br>'
@@ -879,7 +879,7 @@ if uploaded_file is not None:
             )
             st.markdown(
                 '<div style="font-size:0.67rem;color:#66788a;margin-top:6px;margin-bottom:4px;">'
-                '📊 バケット別割当枠（コアを除くファンド数）</div>',
+                'バケット別割当枠（コアを除くファンド数）</div>',
                 unsafe_allow_html=True
             )
             bq_neg    = st.slider("マイナス相関（ヘッジ役）",    0, 6, 2, 1)
@@ -899,7 +899,7 @@ if uploaded_file is not None:
         # key='_rf_rate_slider' を付与することで、スクリプト先頭での
         # session_state 早期読み取りと同期する（ISSUE-7 / BUG-E 統合修正）。
         # 現在の金利環境（日本国債・米国債）を踏まえてデフォルト0.5%に設定。
-        with st.sidebar.expander("📐 シャープレシオ設定", expanded=False):
+        with st.sidebar.expander("シャープレシオ設定", expanded=False):
             rf_rate_param = st.slider(
                 "無リスク金利（年率%）",
                 min_value=0.0, max_value=3.0, value=0.5, step=0.1,
@@ -957,7 +957,7 @@ if uploaded_file is not None:
     <div style="margin-top:16px;padding:8px 0 6px 0;
                 border-top:1px solid rgba(179,144,74,0.2);">
       <div style="font-size:0.7rem;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;
-                  color:#b3904a;margin-bottom:6px;">📊 表示オプション</div>
+                  color:#b3904a;margin-bottom:6px;">表示オプション</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -988,17 +988,17 @@ if uploaded_file is not None:
         )
 
         if _show_summary:
-            st.markdown('<div class="section-header">📊 全ファンド パフォーマンス・リスク・相関サマリー</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">全ファンド パフォーマンス・リスク・相関サマリー</div>', unsafe_allow_html=True)
             st.caption(
-                "💡 **コアファンドとの相関**を確認しながら分析期間を選んでください。"
+                "コアファンドとの相関を確認しながら分析期間を選んでください。"
                 "　設定来列はファンドの全期間データ。"
-                "　🔵コアファンド行　🟡分析実行後：選定ファンド行"
+                "　コアファンド行　分析実行後：選定ファンド行"
             )
 
             tab_perf, tab_risk, tab_corr = st.tabs([
-                "📈 マルチピリオドリターン",
-                "⚠️ リスク指標",
-                "🔗 コアファンド相関"
+                "マルチピリオドリターン",
+                "リスク指標",
+                "コアファンド相関"
             ])
 
             with tab_perf:
@@ -1011,7 +1011,7 @@ if uploaded_file is not None:
                     column_config=make_overview_col_config(_perf_df.columns),
                     use_container_width=True, height=400,
                 )
-                st.caption("💡 列ヘッダークリックでソート可。年率CAGR表示。🔵コアファンド行は凡例のみ（ハイライトは選定後）")
+                st.caption("列ヘッダークリックでソート可。年率CAGR表示。コアファンド行は凡例のみ（ハイライトは選定後）")
 
             with tab_risk:
                 _risk_cols  = ['データ期間(年)', '設定来リターン(年率)', '設定来ボラ',
@@ -1023,7 +1023,7 @@ if uploaded_file is not None:
                     column_config=make_overview_col_config(_risk_df.columns),
                     use_container_width=True, height=400,
                 )
-                st.caption("💡 列ヘッダークリックでソート可。最大DD：-10%以内が理想、-25%超は要注意。シャープ：1.0超が優秀。")
+                st.caption("列ヘッダークリックでソート可。最大DD：-10%以内が理想、-25%超は要注意。シャープ：1.0超が優秀。")
 
             with tab_corr:
                 _corr_cols  = ['データ期間(年)', '設定来リターン(年率)', '設定来ボラ',
@@ -1036,7 +1036,7 @@ if uploaded_file is not None:
                     use_container_width=True, height=400,
                 )
                 st.caption(
-                    f"💡 列ヘッダークリックでソート可。コアファンド「{core_fund_param}」との相関。分散効果の目安：0.3〜0.7が理想ゾーン。"
+                    f"列ヘッダークリックでソート可。コアファンド「{core_fund_param}」との相関。分散効果の目安：0.3〜0.7が理想ゾーン。"
                 )
 
         if run_button:
@@ -1175,7 +1175,7 @@ if uploaded_file is not None:
         
         # ── 選定ファンド統計（サイドバーチェックで制御）────────────
         if st.session_state.get('show_fund_stats', False):
-            st.markdown('<div class="section-header">📋 選定ファンド 詳細統計</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">選定ファンド 詳細統計</div>', unsafe_allow_html=True)
             try:
                 _sel_raw = overview_raw.loc[
                     [f for f in selected_funds if f in overview_raw.index]
@@ -1183,7 +1183,7 @@ if uploaded_file is not None:
                 _sel_raw['コア相関(分析期間)'] = fund_stats.get('コア相関', pd.Series(dtype=float))
                 _styled_sel = style_overview_table(_sel_raw, core_fund, selected_funds)
                 st.dataframe(_styled_sel, use_container_width=True)
-                st.caption("🔵コアファンド　🟡選定ファンド。")
+                st.caption("コアファンド（青）　選定ファンド（黄）。")
             except Exception:
                 display_stats = fund_stats.copy()
                 display_stats['年率リターン'] = (display_stats['年率リターン'] * 100).round(2)
@@ -1460,7 +1460,7 @@ if uploaded_file is not None:
                 '<div style="background:#fefce8;border:1px solid #fde047;'
                 'border-left:4px solid #ca8a04;border-radius:6px;'
                 'padding:8px 14px;font-size:0.8rem;color:#713f12;margin-bottom:8px;">'
-                '📊 <b>生データ（サンプル共分散行列）を使用中</b>　'
+                '<b>生データ（サンプル共分散行列）を使用中</b>　'
                 '観測値をそのまま使用するため説明性・透明性が高い一方、'
                 '短期データでは推定誤差が大きくなる場合があります。'
                 '</div>',
@@ -1536,7 +1536,7 @@ if uploaded_file is not None:
         )
 
         # 詳細分析セクション（外側：プロファイルタブ）
-        st.markdown('<div class="section-header">🔍 プロファイル別 詳細分析</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">プロファイル別 詳細分析</div>', unsafe_allow_html=True)
 
         # 標準5プロファイルのみを外側タブの基本セットとする
         # テールリスク最小型は portfolios dict に含まれているが、
@@ -1559,13 +1559,13 @@ if uploaded_file is not None:
             st.stop()
 
         _profile_label = {
-            "積極型":         "🔴 積極型",
-            "やや積極型":     "🟠 やや積極型",
-            "バランス型":     "🟡 バランス型",
-            "やや保守型":     "🟢 やや保守型",
-            "保守型":         "🔵 保守型",
-            "リスクパリティ": "⚖️ リスクパリティ",
-            "テールリスク最小型": "🛡 テールリスク最小型",
+            "積極型":         "積極型",
+            "やや積極型":     "やや積極型",
+            "バランス型":     "バランス型",
+            "やや保守型":     "やや保守型",
+            "保守型":         "保守型",
+            "リスクパリティ": "リスクパリティ",
+            "テールリスク最小型": "テールリスク最小型",
         }
 
         # 全タブ名一覧（標準5 + 追加分）
@@ -1603,7 +1603,7 @@ if uploaded_file is not None:
                 except Exception as _e:
                     st.error(f"ポートフォリオデータの取得に失敗: {_e}")
 
-                # ── 📊 構成ファンド 個別分析（このプロファイルタブに連動）──
+                # ── 構成ファンド 個別分析（このプロファイルタブに連動）──
                 # render_profile_detail の直後・同一タブ内に配置することで、
                 # 外側タブ切替と構成ファンド表示を完全に連動させる。
                 # Streamlit タブには選択コールバックがないため、
@@ -1712,7 +1712,7 @@ else:
 
   <!-- ウェルカムメッセージ -->
   <div style="text-align:center;margin-bottom:28px;">
-    <div style="font-size:2.8rem;margin-bottom:12px;">📊</div>
+    <div style="font-size:1.4rem;font-weight:700;color:#b3904a;margin-bottom:12px;letter-spacing:0.1em;">PORTFOLIO OPTIMIZER</div>
     <div style="font-size:1.1rem;font-weight:800;color:#d4af6a;letter-spacing:0.04em;margin-bottom:6px;">
       月次基準価格データをアップロードして分析を開始
     </div>
@@ -1728,7 +1728,7 @@ else:
                 border-radius:10px;padding:14px 16px;">
       <div style="font-size:0.6rem;font-weight:800;letter-spacing:0.12em;color:rgba(179,144,74,0.7);
                   margin-bottom:8px;">STEP 1</div>
-      <div style="font-size:0.85rem;margin-bottom:4px;">📂 データアップロード</div>
+      <div style="font-size:0.85rem;margin-bottom:4px;">データアップロード</div>
       <div style="font-size:0.68rem;color:rgba(255,255,255,0.4);line-height:1.5;">
         月次基準価格の Excel ファイルを選択。3年以上・50本以上を推奨
       </div>
@@ -1737,7 +1737,7 @@ else:
                 border-radius:10px;padding:14px 16px;">
       <div style="font-size:0.6rem;font-weight:800;letter-spacing:0.12em;color:rgba(179,144,74,0.7);
                   margin-bottom:8px;">STEP 2</div>
-      <div style="font-size:0.85rem;margin-bottom:4px;">⚙️ 分析設定</div>
+      <div style="font-size:0.85rem;margin-bottom:4px;">分析設定</div>
       <div style="font-size:0.68rem;color:rgba(255,255,255,0.4);line-height:1.5;">
         分析期間・ベンチマーク・コアファンドを選択して分析実行
       </div>
