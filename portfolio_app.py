@@ -1026,7 +1026,7 @@ if uploaded_file is not None:
                     column_config=make_overview_col_config(_perf_df.columns),
                     use_container_width=True, height=400,
                 )
-                st.caption("列ヘッダークリックでソート可。年率CAGR表示。コアファンド行は凡例のみ（ハイライトは選定後）")
+                st.caption("列ヘッダークリックでソート可。年平均リターン（複利）表示。コアファンド行は凡例のみ（ハイライトは選定後）")
 
             with tab_risk:
                 _risk_cols  = ['データ期間(年)', '設定来リターン(年率)', '設定来ボラ',
