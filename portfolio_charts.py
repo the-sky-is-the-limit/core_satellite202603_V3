@@ -76,6 +76,7 @@ def _render_client_view(
     core_fund, core_idx,
     _period_start, _period_end, _period_months,
     port_returns, port_cum_returns,
+    fund_stats=None,
 ):
     """顧客向けリッチHTML表示（顧客モード時に render_profile_detail から呼ばれる）。"""
     import json as _json
@@ -163,6 +164,130 @@ def _render_client_view(
     _yearly_vals_j    = _json.dumps(_yearly_vals)
     _sortino_color    = "#2f855a" if _sortino >= 1.0 else _color_hex
 
+    # ── ポートフォリオ構成テーブルHTML ────────────────────────────
+    # リスク指標カードの下に配置。fund_statsがある場合はリスク・リターン列も表示。
+    _th = (
+        'background:#f1f5f9;color:#1e3a5f;font-size:13px;font-weight:700;'
+        'text-align:center;padding:6px 8px;border:1px solid #dde3ea;'
+        'white-space:normal;line-height:1.35;'
+    )
+    _th_l = _th.replace('text-align:center', 'text-align:left') + 'min-width:130px;'
+    _td_c = (
+        'font-size:13px;text-align:center;padding:5px 8px;'
+        'border:1px solid #dde3ea;color:#1A2540;'
+    )
+    _td_l = _td_c.replace('text-align:center', 'text-align:left')
+
+    _has_stats = fund_stats is not None
+    # ヘッダー行
+    _tbl_header = (
+        f'<tr>'
+        f'<th style="{_th_l}">ポートフォリオ構成</th>'
+        f'<th style="{_th}">割合</th>'
+    )
+    if _has_stats:
+        _tbl_header += (
+            f'<th style="{_th}">年率<br>リターン</th>'
+            f'<th style="{_th}">年平均<br>リスク</th>'
+            f'<th style="{_th}">シャープ</th>'
+            f'<th style="{_th}">ソルティノ</th>'
+            f'<th style="{_th}">最大DD</th>'
+        )
+    _tbl_header += '</tr>'
+
+    # データ行（コア先頭、残りは割合降順）
+    _tbl_rows = ""
+    for _h in _holdings:
+        _fname = selected_funds[next(
+            i for i, f in enumerate(selected_funds)
+            if f.startswith(_h["code"])
+        )]
+        _is_core = (_fname == core_fund)
+        _row_bg  = '#dbeafe' if _is_core else '#ffffff'
+        _row_fw  = 'bold'    if _is_core else 'normal'
+        _td_base = f'font-weight:{_row_fw};background:{_row_bg};'
+
+        _disp_name = _h["name"]
+        if _is_core:
+            _disp_name = f'★ {_disp_name}'
+
+        _row = (
+            f'<tr>'
+            f'<td style="{_td_l}{_td_base}white-space:nowrap;overflow:hidden;'
+            f'text-overflow:ellipsis;max-width:200px;">{_disp_name}</td>'
+            f'<td style="{_td_c}{_td_base}font-family:monospace;">{_h["weight"]}%</td>'
+        )
+        if _has_stats and _fname in fund_stats.index:
+            _fs   = fund_stats.loc[_fname]
+            _fret = _fs.get('年率リターン', float('nan'))
+            _fvol = _fs.get('年率ボラ',     float('nan'))
+            _fsr  = _fs.get('シャープレシオ', float('nan'))
+            _fso  = _fs.get('ソルティノレシオ', float('nan'))
+            _fdd  = _fs.get('最大DD',       float('nan'))
+
+            def _fc_ret(v):
+                if pd.isna(v): return '#ffffff'
+                return '#bbf7d0' if v*100 >= 5 else ('#fef9c3' if v*100 >= 0 else '#fee2e2')
+            def _fc_sr(v):
+                if pd.isna(v): return '#ffffff'
+                return '#bbf7d0' if v >= 1.0 else ('#fef9c3' if v >= 0.5 else '#fee2e2')
+            def _fc_dd(v):
+                if pd.isna(v): return '#ffffff'
+                return '#bbf7d0' if v*100 > -10 else ('#fef9c3' if v*100 > -25 else '#fee2e2')
+
+            _bg_ret = _row_bg if _is_core else _fc_ret(_fret)
+            _bg_sr  = _row_bg if _is_core else _fc_sr(_fsr)
+            _bg_dd  = _row_bg if _is_core else _fc_dd(_fdd)
+
+            _row += (
+                f'<td style="{_td_c}font-weight:{_row_fw};background:{_bg_ret};">'
+                f'{"—" if pd.isna(_fret) else f"{_fret*100:+.1f}%"}</td>'
+                f'<td style="{_td_c}{_td_base}">'
+                f'{"—" if pd.isna(_fvol) else f"{_fvol*100:.1f}%"}</td>'
+                f'<td style="{_td_c}font-weight:{_row_fw};background:{_bg_sr};">'
+                f'{"—" if pd.isna(_fsr) else f"{_fsr:.2f}"}</td>'
+                f'<td style="{_td_c}{_td_base}">'
+                f'{"—" if pd.isna(_fso) else f"{min(_fso,99.9):.1f}"}</td>'
+                f'<td style="{_td_c}font-weight:{_row_fw};background:{_bg_dd};">'
+                f'{"—" if pd.isna(_fdd) else f"{_fdd*100:.1f}%"}</td>'
+            )
+        elif _has_stats:
+            _row += '<td colspan="5" style="' + _td_c + '">—</td>'
+        _row += '</tr>'
+        _tbl_rows += _row
+
+    # ポートフォリオ合計行
+    _port_ret_v = selected_stats.get('年率リターン', float('nan'))
+    _port_vol_v = selected_stats.get('年率ボラティリティ', float('nan'))
+    _port_sr_v  = selected_stats.get('シャープレシオ',  float('nan'))
+    _port_so_v  = selected_stats.get('ソルティノレシオ', float('nan'))
+    _port_dd_v  = selected_stats.get('最大ドローダウン', float('nan'))
+    _total_row = (
+        f'<tr style="border-top:2px solid #b3904a;">'
+        f'<td style="{_td_l}font-weight:700;background:#fffbea;">ポートフォリオ</td>'
+        f'<td style="{_td_c}font-weight:700;background:#fffbea;font-family:monospace;">100%</td>'
+    )
+    if _has_stats:
+        _total_row += (
+            f'<td style="{_td_c}font-weight:700;background:#fffbea;">'
+            f'{"—" if pd.isna(_port_ret_v) else f"{_port_ret_v*100:+.1f}%"}</td>'
+            f'<td style="{_td_c}font-weight:700;background:#fffbea;">'
+            f'{"—" if pd.isna(_port_vol_v) else f"{_port_vol_v*100:.1f}%"}</td>'
+            f'<td style="{_td_c}font-weight:700;background:#fffbea;">'
+            f'{"—" if pd.isna(_port_sr_v)  else f"{_port_sr_v:.2f}"}</td>'
+            f'<td style="{_td_c}font-weight:700;background:#fffbea;">'
+            f'{"—" if pd.isna(_port_so_v)  else f"{min(_port_so_v,99.9):.1f}"}</td>'
+            f'<td style="{_td_c}font-weight:700;background:#fffbea;">'
+            f'{"—" if pd.isna(_port_dd_v)  else f"{_port_dd_v*100:.1f}%"}</td>'
+        )
+    _total_row += '</tr>'
+
+    _alloc_table_html = (
+        '<table style="width:100%;border-collapse:collapse;font-family:\'Noto Sans JP\',sans-serif;">'
+        + _tbl_header + _tbl_rows + _total_row
+        + '</table>'
+    )
+
     _client_html = f"""<!DOCTYPE html>
     <html lang="ja">
     <head>
@@ -192,7 +317,6 @@ def _render_client_view(
     .mc .unit{{font-size:15px;font-weight:400;opacity:0.7;}}
     .mc .note{{font-size:15px;color:#334155;margin-top:6px;line-height:1.5;}}
     .mc .warn{{font-size:15px;color:#7a5c00;margin-top:4px;font-weight:500;}}
-    .lower-grid{{display:grid;grid-template-columns:2fr 1fr;gap:10px;padding:0 20px 14px;}}
     .card{{background:#fff;border:1px solid rgba(30,60,120,0.10);border-radius:9px;padding:16px 16px 12px;
       box-shadow:0 1px 4px rgba(30,60,120,0.05);}}
     .card-title{{font-size:14px;color:#1e3a5f;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;font-weight:600;}}
@@ -210,6 +334,9 @@ def _render_client_view(
       margin-bottom:8px;display:flex;align-items:center;gap:5px;font-weight:700;}}
     .disc-box p{{font-size:14px;color:#334155;line-height:1.9;margin-bottom:5px;}}
     .yearly-wrap{{padding:0 20px 14px;}}
+    .alloc-wrap{{padding:0 20px 14px;}}
+    .alloc-wrap .sec-title{{font-size:14px;color:#1e3a5f;letter-spacing:0.08em;text-transform:uppercase;
+      font-weight:600;margin-bottom:8px;}}
     </style>
     </head>
     <body>
@@ -260,15 +387,11 @@ def _render_client_view(
     <div class="warn">⚑ 過去の実績値</div>
       </div>
     </div>
-    <div class="lower-grid">
+    <div style="padding:0 20px 14px;">
       <div class="card">
     <div class="card-title">基準価額の推移（指数化：初月＝1.0000）</div>
     <div class="card-sub">分析開始月を1.0000として指数化。将来の推移を示すものではありません。</div>
     <div class="chart-wrap"><canvas id="cumChart"></canvas></div>
-      </div>
-      <div class="card">
-    <div class="card-title">ポートフォリオ構成</div>
-    <div style="margin-top:8px;">{_hold_rows}</div>
       </div>
     </div>
     <div class="risk-row">
@@ -291,6 +414,16 @@ def _render_client_view(
     <div class="lbl">月次 CVaR (95%)</div>
     <div class="val" style="color:#c05621;">{_cvar95:.2f}<span style="font-size:15px;font-weight:400;">%</span></div>
     <div class="note">VaR超過時の期待損失</div>
+      </div>
+    </div>
+    <div class="alloc-wrap">
+      <div class="card">
+    <div class="sec-title">ポートフォリオ構成</div>
+    {_alloc_table_html}
+    <div style="font-size:12px;color:#64748b;margin-top:6px;line-height:1.6;">
+      ★コアファンド（青）。リターン：+5%超=濃緑 / 0〜5%=薄緑 / マイナス=赤。
+      シャープ：1.0超=緑 / 0.5-1.0=黄 / 0.5未満=赤。最大DD：-10%以内=緑 / -25%以内=黄 / -25%超=赤。
+    </div>
       </div>
     </div>
     <div class="yearly-wrap">
@@ -393,7 +526,7 @@ def _render_client_view(
     </script>
     </body>
     </html>"""
-    _components.html(_client_html, height=1100, scrolling=False)
+    _components.html(_client_html, height=1550, scrolling=False)
 
 
 
@@ -1844,6 +1977,7 @@ def render_profile_detail(
             core_fund, core_idx,
             _period_start, _period_end, _period_months,
             port_returns, port_cum_returns,
+            fund_stats=fund_stats,
         )
 
     # ── 担当者向けタブ描画（tab1〜3 は if not _is_client ブロック内） ──
