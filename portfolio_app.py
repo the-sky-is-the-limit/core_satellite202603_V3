@@ -609,13 +609,12 @@ st.markdown("""
     }
 
     /* ── レイアウト幅制御 ── */
-    /* layout="wide" のデフォルトは画面100%だが、データテーブルやチャートが
-       横に広がりすぎて視認性が落ちるため、85%に制限して中央寄せ。
-       ヘッダー（.hfd-header）はネガティブマージンで全幅を維持。 */
+    /* layout="wide" のデフォルトはpadding過大でコンテンツが狭くなりがち。
+       左右paddingを抑えてレポート・カード・テーブルの表示幅を確保。 */
     .main .block-container {
-        max-width: 85% !important;
-        padding-left: 2rem !important;
-        padding-right: 2rem !important;
+        padding-left: 3rem !important;
+        padding-right: 3rem !important;
+        padding-top: 1rem !important;
     }
 
 </style>
