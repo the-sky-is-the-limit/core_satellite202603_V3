@@ -1051,13 +1051,16 @@ def render_report_panel(
             _styled_summ,
             use_container_width=True,
         )
-        st.caption(
-            f"コアファンド「{core_fund}」行は青ハイライト。"
-            "　リターン: +10%超=濃緑 / +3〜10%=緑 / 0〜3%=薄緑 / マイナス=赤。"
-            "　シャープ: <span style='color:#1e7a4e;'>■</span>1.0超 / <span style='color:#d4a017;'>■</span>0.5-1.0 / <span style='color:#c0392b;'>■</span>0.5未満。"
-            "　最大DD: <span style='color:#1e7a4e;'>■</span>-10%以内 / <span style='color:#d4a017;'>■</span>-10〜-25% / <span style='color:#c0392b;'>■</span>-25%超。"
-            "　コア相関: <span style='color:#1e7a4e;'>■</span>0.3-0.7=分散◎ / <span style='color:#d4a017;'>■</span>0.7-0.9=やや高 / <span style='color:#c0392b;'>■</span>0.9超=高相関 / 灰=低相関。"
-            "　列ヘッダーをクリックで昇順/降順ソートが可能（数値として正しく並び替え）。"
+        st.markdown(
+            f'<div style="font-size:0.78rem;color:rgba(49,51,63,0.6);line-height:1.7;">'
+            f'コアファンド「{core_fund}」行は青ハイライト。'
+            '　リターン: +10%超=濃緑 / +3〜10%=緑 / 0〜3%=薄緑 / マイナス=赤。'
+            '　シャープ: <span style="color:#1e7a4e;">■</span>1.0超 / <span style="color:#d4a017;">■</span>0.5-1.0 / <span style="color:#c0392b;">■</span>0.5未満。'
+            '　最大DD: <span style="color:#1e7a4e;">■</span>-10%以内 / <span style="color:#d4a017;">■</span>-10〜-25% / <span style="color:#c0392b;">■</span>-25%超。'
+            '　コア相関: <span style="color:#1e7a4e;">■</span>0.3-0.7=分散◎ / <span style="color:#d4a017;">■</span>0.7-0.9=やや高 / <span style="color:#c0392b;">■</span>0.9超=高相関 / 灰=低相関。'
+            '　列ヘッダーをクリックで昇順/降順ソートが可能（数値として正しく並び替え）。'
+            '</div>',
+            unsafe_allow_html=True,
         )
     with _rpt_tab3:
         st.markdown('<div class="tab-sub-header">リスク・リターン マップ（分析期間）</div>', unsafe_allow_html=True)
