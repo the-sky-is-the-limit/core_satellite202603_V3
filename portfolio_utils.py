@@ -1548,10 +1548,10 @@ class FundScreener:
     # デフォルトのバケット別割当枠（コアを除く n_final-1 本の配分比率）
     # キーはバケット名、値は割当の「重み」（実際の本数は n_final に応じてスケール）
     #
-    # 合計値 19 は「n_final=20 本構成」を基準とした参照値。
+    # 合計値 23 は「n_final=24 本構成」を基準とした参照値。
     # アプリのサイドバーデフォルトは n_final=30 のため、実際には screen_funds() 内で
-    # スケール計算（scale = (n_final-1) / 19）が自動適用される（bucket_quota=None 時）。
-    # n_final を変更する場合でも、比率（2:3:5:5:4）は維持されたまま本数のみ変わる。
+    # スケール計算（scale = (n_final-1) / 23）が自動適用される（bucket_quota=None 時）。
+    # n_final を変更する場合でも、比率（2:5:6:6:4）は維持されたまま本数のみ変わる。
     _DEFAULT_BUCKET_QUOTA: Dict[str, int] = {
         'マイナス相関': 2,
         '低相関':       5,  # 旧3 → 5：候補27本に対して3本は過少。分散役を強化し補完依存を低減
@@ -1657,7 +1657,7 @@ class FundScreener:
             quota.update(bucket_quota)
 
         # n_final が変わった場合にデフォルト割当をスケール
-        default_total = sum(self._DEFAULT_BUCKET_QUOTA.values())  # 19
+        default_total = sum(self._DEFAULT_BUCKET_QUOTA.values())  # 23
         target_total  = n_final - 1  # コアを除いた選定数
         if target_total != default_total and bucket_quota is None:
             scale = target_total / default_total
@@ -2055,6 +2055,12 @@ def export_results_to_excel(portfolios: Dict,
                             output_path: str):
     """
     分析結果をExcelにエクスポート
+
+    .. deprecated::
+        v2.0.1以降、Excelエクスポートは portfolio_report.render_export_section()
+        が担っており、本関数はアプリ内から呼び出されていません。
+        外部スクリプトからの利用互換性のために残していますが、
+        将来のバージョンで削除される可能性があります。
     
     Parameters:
     -----------
