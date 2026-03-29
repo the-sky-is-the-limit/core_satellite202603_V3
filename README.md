@@ -88,9 +88,12 @@ streamlit run portfolio_app.py
 
 ```
 .
-├── portfolio_app.py               # メインアプリ（v2.1 / エントリーポイント）
+├── portfolio_app.py               # メインアプリ（エントリーポイント）
 ├── portfolio_charts.py            # 描画モジュール（プロファイル詳細・構成銘柄分析）
+├── portfolio_data.py              # データ層（Excel読込・概観テーブル計算・表示整形）
+├── portfolio_report.py            # レポート層（サマリーパネル・Excelエクスポート）
 ├── portfolio_utils.py             # ユーティリティモジュール（最適化・スクリーニング）
+├── test_app.py                    # 動作確認テストスクリプト
 ├── requirements.txt               # 依存パッケージ
 ├── frends202512.xlsx              # サンプルデータ
 ├── QUICKSTART.md                  # クイックスタートガイド
