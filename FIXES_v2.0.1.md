@@ -1,5 +1,12 @@
 # 修正完了レポート
 
+> **⚠ アーカイブ注記**: 本ドキュメントはv2.0.1修正時点の記録です。
+> その後のリファクタ（2026-03）でファイル構成が変更されており、
+> 本文中のファイル名は以下のように読み替えてください:
+> - `portfolio_optimizer_pro_v2.py` → `portfolio_app.py` + `portfolio_charts.py` + `portfolio_data.py` + `portfolio_report.py`
+> - `QUICKSTART_v2.md` → `QUICKSTART.md`
+> - `README_v2.md` → `README.md`
+
 ## 実施日時
 2026年1月9日
 
