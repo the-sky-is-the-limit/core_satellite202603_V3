@@ -102,7 +102,7 @@ st.markdown("""
     }
     .profile-card {
         flex: 1;
-        min-width: 155px;
+        min-width: 185px;
         border-radius: 6px;
         overflow: hidden;
         border: 2px solid #e8ecf0;
@@ -146,7 +146,7 @@ st.markdown("""
         margin-top: 2px;
     }
     .profile-card-body {
-        padding: 10px 12px;
+        padding: 10px 14px;
     }
     .profile-card-row {
         display: flex;
