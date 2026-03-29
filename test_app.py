@@ -110,9 +110,12 @@ def test_screening(df):
         # m-3: risk_free_rate を明示（本番デフォルト 0.5% に合わせる）
         screener = FundScreener(returns, risk_free_rate=0.005)
 
-        # コアファンドを仮選定（シャープレシオ上位）
+        # コアファンドを仮選定（キャッシュファンドを除外してシャープレシオ上位）
+        # 本番の FundScreener ではキャッシュファンド（年率ボラ < 3%）を除外するため、
+        # テストでも同一基準で除外し、実運用に近い検証を行う。
         stats = screener.get_statistics()
-        core_fund = stats['シャープレシオ'].idxmax()
+        non_cash = stats[~stats['is_cash_fund']]
+        core_fund = non_cash['シャープレシオ'].idxmax()
 
         print(f"✓ コアファンド選定: {core_fund}")
         print(f"  - シャープレシオ: {stats.loc[core_fund, 'シャープレシオ']:.3f}")
