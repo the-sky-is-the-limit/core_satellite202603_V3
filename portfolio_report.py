@@ -195,6 +195,17 @@ def build_report_data(
     # ─── 健全性チェック ＋ コアファンド情報バー（診断パネル）────────
     # [ISSUE-6修正] 旧実装は st.session_state.get('show_diagnosis') を直接参照していたが、
     # 引数として受け取った show_diagnosis を一貫して使用するよう修正する。
+    #
+    # [BUG-Ph4修正] 旧実装は show_diagnosis=True 時に st.markdown() を直接呼び出しており、
+    # データ構築関数が UI 描画（副作用）を内包していた。これを修正し:
+    #   - 健全性チェックの結果は health_warnings（HTMLリスト）として返す
+    #   - コアバーの HTML は core_bar_html として返す
+    #   - 実際の st.markdown() 呼び出しは render_report_panel が行う
+    # これにより build_report_data は純粋なデータ計算関数になり、
+    # テスト環境での呼び出しや将来の再利用が可能になる。
+    _health_warnings: list = []   # (html_str,) のリスト
+    _core_bar_html: str = ""
+
     if show_diagnosis:
         # [ISSUE-6修正] aggressive_vol / conservative_vol を削除。
         # BUG-1修正（2026-03）で if/else ブランチを整理した際、
@@ -208,82 +219,81 @@ def build_report_data(
         # ── 単調性チェック：保守→積極の順にリターン↑・ボラ↑が成立するか確認 ──
         # elif 連鎖ではなく独立した if で評価し、複数の問題を同時に表示できるようにする
         _p_order = ["保守型", "やや保守型", "バランス型", "やや積極型", "積極型"]
-        _vols    = [portfolios[p]['stats']['年率ボラティリティ'] for p in _p_order]
-        _rets    = [portfolios[p]['stats']['年率リターン']       for p in _p_order]
-        _srs     = [portfolios[p]['stats']['シャープレシオ']     for p in _p_order]
+        _p_avail = [p for p in _p_order if p in portfolios]   # 存在するプロファイルのみ
+        _vols    = [portfolios[p]['stats']['年率ボラティリティ'] for p in _p_avail]
+        _rets    = [portfolios[p]['stats']['年率リターン']       for p in _p_avail]
+        _srs     = [portfolios[p]['stats']['シャープレシオ']     for p in _p_avail]
 
         _mono_vol_ok = all(_vols[i] <= _vols[i+1] for i in range(len(_vols)-1))
         _mono_ret_ok = all(_rets[i] <= _rets[i+1] for i in range(len(_rets)-1))
 
         # ボラティリティ単調性違反があるプロファイルペアを特定
         _vol_violations = [
-            f"{_p_order[i]}({_vols[i]*100:.1f}%) > {_p_order[i+1]}({_vols[i+1]*100:.1f}%)"
+            f"{_p_avail[i]}({_vols[i]*100:.1f}%) > {_p_avail[i+1]}({_vols[i+1]*100:.1f}%)"
             for i in range(len(_vols)-1) if _vols[i] > _vols[i+1]
         ]
         _ret_violations = [
-            f"{_p_order[i]}({_rets[i]*100:.1f}%) > {_p_order[i+1]}({_rets[i+1]*100:.1f}%)"
+            f"{_p_avail[i]}({_rets[i]*100:.1f}%) > {_p_avail[i+1]}({_rets[i+1]*100:.1f}%)"
             for i in range(len(_rets)-1) if _rets[i] > _rets[i+1]
         ]
         # シャープレシオ：バランス型が最も高効率であるべきという期待に反するケースを検出
         # 保守型のシャープがバランス型を大きく上回る場合、コアが効率的すぎてサテライトが足を引っ張っている
-        _bal_idx  = _p_order.index("バランス型")
-        _cons_idx = _p_order.index("保守型")
-        _sr_bal_vs_cons_warn = (
-            _srs[_cons_idx] > _srs[_bal_idx] + 0.1  # 0.1超の差で警告（軽微な逆転はノイズのため無視）
-        )
-
         _any_warn = False
+        if "バランス型" in _p_avail and "保守型" in _p_avail:
+            _bal_idx  = _p_avail.index("バランス型")
+            _cons_idx = _p_avail.index("保守型")
+            _sr_bal_vs_cons_warn = (
+                _srs[_cons_idx] > _srs[_bal_idx] + 0.1  # 0.1超の差で警告（軽微な逆転はノイズのため無視）
+            )
+        else:
+            _sr_bal_vs_cons_warn = False
+            _bal_idx = _cons_idx = 0  # unused sentinel
 
         if not _mono_vol_ok:
             _any_warn = True
             _viol_str = "　/　".join(_vol_violations)
-            st.markdown(
+            _health_warnings.append(
                 f'<div class="health-warn">⚠️ <b>ボラティリティの逆転</b>　'
                 f'保守→積極の順にリスクが増加すべきところ、以下のプロファイル間で逆転しています。<br>'
                 f'<span style="font-size:0.92rem;">{_viol_str}</span><br>'
-                f'コアファンドの変更またはスクリーニング条件の調整をご検討ください。</div>',
-                unsafe_allow_html=True
+                f'コアファンドの変更またはスクリーニング条件の調整をご検討ください。</div>'
             )
 
         if not _mono_ret_ok:
             _any_warn = True
             _viol_str = "　/　".join(_ret_violations)
-            st.markdown(
+            _health_warnings.append(
                 f'<div class="health-warn">⚠️ <b>リターンの逆転</b>　'
                 f'保守→積極の順にリターンが増加すべきところ、以下のプロファイル間で逆転しています。<br>'
                 f'<span style="font-size:0.92rem;">{_viol_str}</span><br>'
-                f'サテライトファンドの質（シャープレシオ）をご確認ください。</div>',
-                unsafe_allow_html=True
+                f'サテライトファンドの質（シャープレシオ）をご確認ください。</div>'
             )
 
         if _sr_bal_vs_cons_warn:
             _any_warn = True
-            st.markdown(
+            _health_warnings.append(
                 f'<div class="health-warn">⚠️ <b>シャープレシオの逆転</b>　'
                 f'保守型（{_srs[_cons_idx]:.2f}）のリスク効率がバランス型（{_srs[_bal_idx]:.2f}）を大きく上回っています。<br>'
                 f'サテライトファンドがポートフォリオ効率を低下させている可能性があります。'
-                f'スクリーニング条件の見直しをご検討ください。</div>',
-                unsafe_allow_html=True
+                f'スクリーニング条件の見直しをご検討ください。</div>'
             )
 
         if core_sharpe < 0.5:
             _any_warn = True
-            st.markdown(
+            _health_warnings.append(
                 f'<div class="health-warn">⚠️ <b>コアファンドの効率性</b>　シャープレシオ {core_sharpe:.2f} は目安（0.5）を下回っています。'
-                f'別のファンドをコアとすることで全体効率が改善する可能性があります。</div>',
-                unsafe_allow_html=True
+                f'別のファンドをコアとすることで全体効率が改善する可能性があります。</div>'
             )
 
         if not _any_warn:
-            st.markdown(
+            _health_warnings.append(
                 f'<div class="health-ok">✅ <b>ポートフォリオは健全です</b>　'
                 f'保守→積極の順にリスク・リターンが単調増加しています。'
-                f'コアファンドのシャープレシオ（{core_sharpe:.2f}）も良好です。</div>',
-                unsafe_allow_html=True
+                f'コアファンドのシャープレシオ（{core_sharpe:.2f}）も良好です。</div>'
             )
 
         _ret_sign = "+" if core_return >= 0 else ""
-        st.markdown(
+        _core_bar_html = (
             f'<div class="core-bar">'
             f'<span class="core-bar-label">★ コアファンド</span>'
             f'<span class="core-bar-name">{core_fund}</span>'
@@ -294,8 +304,7 @@ def build_report_data(
             f'<span class="core-bar-item">最大DD <b style="color:#c0392b">{core_stats_fs["最大DD"]*100:.1f}%</b></span>'
             f'<span style="color:#dde3ea">|</span>'
             f'<span class="core-bar-item" style="color:#7a5c00;">無リスク金利 <b>{rf_rate*100:.1f}%</b></span>'
-            f'</div>',
-            unsafe_allow_html=True
+            f'</div>'
         )
     else:
         # 変数は後続処理（コアバー in tab2等）でも参照されるため計算だけ実施
@@ -314,6 +323,10 @@ def build_report_data(
         "core_sharpe":         core_sharpe,
         "core_volatility":     core_volatility,
         "core_return":         core_return,
+        # [BUG-Ph4修正] 健全性チェック結果を HTML 文字列リストで返す。
+        # 描画は呼び出し元（render_report_panel）が行う。
+        "health_warnings":     _health_warnings,
+        "core_bar_html":       _core_bar_html,
     }
 
 
@@ -341,6 +354,16 @@ def render_report_panel(
     # ctx 内の値を実際に使うことで設計と実装を一致させる。
     comparison_df       = ctx.get("comparison_df",       pd.DataFrame())
     _comparison_col_cfg = ctx.get("_comparison_col_cfg", {})
+
+    # [BUG-Ph4修正] build_report_data が生成した健全性チェック HTML を描画。
+    # 旧実装では build_report_data 内で直接 st.markdown() を呼んでいたが、
+    # データ計算関数が UI 副作用を持つべきでないため、描画責任をここに移した。
+    for _hw in ctx.get("health_warnings", []):
+        st.markdown(_hw, unsafe_allow_html=True)
+    _core_bar_html = ctx.get("core_bar_html", "")
+    if _core_bar_html:
+        st.markdown(_core_bar_html, unsafe_allow_html=True)
+
     # ─── プロファイルカード ───────────────────────────────────
     # ─── 統合レポートパネル（3タブ構成: 比較/構成/リスク・リターン）──────
 
@@ -348,6 +371,10 @@ def render_report_panel(
     _profile_order_list = ["積極型", "やや積極型", "バランス型", "やや保守型", "保守型"]
     _all_stats = {}
     for _pn in _profile_order_list:
+        # [BUG-Ph4付随修正] KeyError ガード: 将来プロファイル削除時やテスト時に
+        # portfolios にエントリが存在しない場合でもクラッシュしないよう保護する。
+        if _pn not in portfolios:
+            continue
         _ps = portfolios[_pn]["stats"]
         _pw = portfolios[_pn]["weights"]
         _all_stats[_pn] = {
@@ -792,6 +819,8 @@ def render_report_panel(
         # render_report_panel 内で表示されていなかった（設計と実装の乖離）。
         # ctx から取り出した comparison_df をここで描画することで、
         # 「比較サマリー」タブの内容を完結させる。
+        # [FIX-LOW-Ph4-2] _comparison_col_cfg が column_config=で正しく渡されていることを確認済み（L831）。
+        # build_report_data で生成→ctx 経由で渡される→ここで使用という流れが意図通り機能している。
         if not comparison_df.empty:
             st.markdown('<hr style="border:none;border-top:1px solid #e2e8f0;margin:18px 0 12px 0;">', unsafe_allow_html=True)
             _cmp_title = "5プロファイル + 参考配分 数値比較" if _show_rp else "5プロファイル 数値比較"
@@ -1239,101 +1268,108 @@ def render_export_section(
     """Excel エクスポートセクション（ダウンロードボタン）を描画する。"""
     st.markdown('<div class="section-header">💾 結果のエクスポート</div>', unsafe_allow_html=True)
 
-    if st.button("📥 Excelファイルをダウンロード"):
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+    # [FIX-LOW-Ph4-1] 旧実装は「st.button でクリック → Excel 生成 → st.download_button 出現」
+    # という2クリック構造だった。st.download_button に data= として BytesIO を直接渡すことで
+    # 1クリックでダウンロードが完了する UX に改善する。
+    # Excel 生成は毎 run で実行されるが、ファンド数 30 本・6プロファイルで < 0.5秒 のため許容範囲。
+    # 生成コストを下げたい場合は @st.cache_data で出力バイト列をキャッシュすることを検討。
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
 
-            # ── ポートフォリオ比較シート ──────────────────────────
-            _comp_export = comparison_df.rename(columns={
-                "年平均リターン": "年平均リターン(%)",
-                "年率価格変動リスク": "年率価格変動リスク(%)",
-                "最大DD":       "最大DD(%)",
-                "コア比率":     "コア比率(%)",
-                "ファンド数":   "ファンド数(本)",
-            })
-            _comp_export.to_excel(writer, sheet_name='ポートフォリオ比較', index=False)
+        # ── ポートフォリオ比較シート ──────────────────────────
+        _comp_export = comparison_df.rename(columns={
+            "年平均リターン": "年平均リターン(%)",
+            "年率価格変動リスク": "年率価格変動リスク(%)",
+            "最大DD":       "最大DD(%)",
+            "コア比率":     "コア比率(%)",
+            "ファンド数":   "ファンド数(本)",
+        })
+        _comp_export.to_excel(writer, sheet_name='ポートフォリオ比較', index=False)
 
-            # ── 統合ファンド構成シート ────────────────────────────
-            allocation_df_numeric.to_excel(writer, sheet_name='統合ファンド構成(%)')
+        # ── 統合ファンド構成シート ────────────────────────────
+        allocation_df_numeric.to_excel(writer, sheet_name='統合ファンド構成(%)')
 
-            # ── 各プロファイル個別シート ──────────────────────────
-            # 分析期間ラベル（例: 36ヶ月 → "3年"）
-            _period_map = {12: "1年", 36: "3年", 60: "5年", 120: "10年", 180: "15年"}
-            _period_lbl = _period_map.get(period_months, f"{period_months}ヶ月") if period_months else ""
+        # ── 各プロファイル個別シート ──────────────────────────
+        # 分析期間ラベル（例: 36ヶ月 → "3年"）
+        _period_map = {12: "1年", 36: "3年", 60: "5年", 120: "10年", 180: "15年"}
+        _period_lbl = _period_map.get(period_months, f"{period_months}ヶ月") if period_months else ""
 
-            for profile_name, portfolio in portfolios.items():
-                w    = portfolio["weights"]
-                pst  = portfolio["stats"]
+        for profile_name, portfolio in portfolios.items():
+            w    = portfolio["weights"]
+            pst  = portfolio["stats"]
 
-                # ── 構成ファンド行（weight > 0.1%）────────────────
-                _rows = []
-                for i, fund in enumerate(selected_funds):
-                    _w_pct = round(w[i] * 100, 2)
-                    if _w_pct <= 0.1:
-                        continue
-                    # fund_stats から個別指標を取得（存在しない列はNaN）
-                    if fund in fund_stats.index:
-                        _fs  = fund_stats.loc[fund]
-                        _ret = round(float(_fs.get('年率リターン', float('nan'))) * 100, 2)
-                        _vol = round(float(_fs.get('年率ボラ',     float('nan'))) * 100, 2)
-                        _sr  = round(float(_fs.get('シャープレシオ', float('nan'))), 6)
-                        _mdd = round(float(_fs.get('最大DD',        float('nan'))) * 100, 2)
-                    else:
-                        _ret = _vol = _sr = _mdd = float('nan')
+            # ── 構成ファンド行（weight > 0.1%）────────────────
+            _rows = []
+            for i, fund in enumerate(selected_funds):
+                _w_pct = round(w[i] * 100, 2)
+                if _w_pct <= 0.1:
+                    continue
+                # fund_stats から個別指標を取得（存在しない列はNaN）
+                if fund in fund_stats.index:
+                    _fs  = fund_stats.loc[fund]
+                    _ret = round(float(_fs.get('年率リターン', float('nan'))) * 100, 2)
+                    _vol = round(float(_fs.get('年率ボラ',     float('nan'))) * 100, 2)
+                    _sr  = round(float(_fs.get('シャープレシオ', float('nan'))), 6)
+                    _mdd = round(float(_fs.get('最大DD',        float('nan'))) * 100, 2)
+                else:
+                    _ret = _vol = _sr = _mdd = float('nan')
 
-                    _rows.append({
-                        'ファンド':       fund,
-                        '比重(%)':        _w_pct,
-                        '年平均リターン(%)': _ret,
-                        '年率価格変動リスク(%)': _vol,
-                        'シャープ':        _sr,
-                        '最大DD(%)':       _mdd,
-                    })
+                _rows.append({
+                    'ファンド':       fund,
+                    '比重(%)':        _w_pct,
+                    '年平均リターン(%)': _ret,
+                    '年率価格変動リスク(%)': _vol,
+                    'シャープ':        _sr,
+                    '最大DD(%)':       _mdd,
+                })
 
-                _df = pd.DataFrame(_rows).sort_values('比重(%)', ascending=False)
+            _df = pd.DataFrame(_rows).sort_values('比重(%)', ascending=False)
 
-                # ── ポートフォリオ合計行 ──────────────────────────
-                _port_ret = round(float(pst.get('年率リターン',       0)) * 100, 2)
-                _port_vol = round(float(pst.get('年率ボラティリティ', 0)) * 100, 2)
-                _port_sr  = round(float(pst.get('シャープレシオ',     0)), 3)
-                _port_mdd = round(float(pst.get('最大ドローダウン',   0)) * 100, 2)
+            # ── ポートフォリオ合計行 ──────────────────────────
+            _port_ret = round(float(pst.get('年率リターン',       0)) * 100, 2)
+            _port_vol = round(float(pst.get('年率ボラティリティ', 0)) * 100, 2)
+            _port_sr  = round(float(pst.get('シャープレシオ',     0)), 3)
+            _port_mdd = round(float(pst.get('最大ドローダウン',   0)) * 100, 2)
 
-                _summary_label = f"{_period_lbl}{profile_name}ポートフォリオ" if _period_lbl else f"{profile_name}ポートフォリオ"
-                _summary_row = pd.DataFrame([{
-                    'ファンド':       _summary_label,
-                    # [P3修正] '100%'（文字列）→ 100.0（float）に統一。
-                    # 文字列混在で列 dtype が object になり Excel での数値ソート・集計が不可になる問題を解消。
-                    '比重(%)':        100.0,
-                    '年平均リターン(%)': _port_ret,
-                    '年率価格変動リスク(%)': _port_vol,
-                    'シャープ':        _port_sr,
-                    '最大DD(%)':       _port_mdd,
-                }])
+            _summary_label = f"{_period_lbl}{profile_name}ポートフォリオ" if _period_lbl else f"{profile_name}ポートフォリオ"
+            _summary_row = pd.DataFrame([{
+                'ファンド':       _summary_label,
+                # [P3修正] '100%'（文字列）→ 100.0（float）に統一。
+                # 文字列混在で列 dtype が object になり Excel での数値ソート・集計が不可になる問題を解消。
+                '比重(%)':        100.0,
+                '年平均リターン(%)': _port_ret,
+                '年率価格変動リスク(%)': _port_vol,
+                'シャープ':        _port_sr,
+                '最大DD(%)':       _port_mdd,
+            }])
 
-                _export_df = pd.concat([_df, _summary_row], ignore_index=True)
+            _export_df = pd.concat([_df, _summary_row], ignore_index=True)
 
-                # シート名: Excel の制限（31文字以内、特殊文字禁止）
-                sheet_name = (profile_name[:28] if len(profile_name) <= 28 else profile_name[:28])
-                _export_df.to_excel(writer, sheet_name=sheet_name, index=False)
+            # シート名: Excel の制限（31文字以内、特殊文字禁止）
+            # [BUG-Ph4修正] 旧実装は両辺が同一（常に[:28]スライス）だったため
+            # 25文字以下の名前でも不要なスライスが実行されていた。
+            # 正しくは「28文字以内ならそのまま、超えたら切り詰め」。
+            sheet_name = profile_name if len(profile_name) <= 28 else profile_name[:28]
+            _export_df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-            # ── ファンド統計シート ────────────────────────────────
-            fund_stats_export = fund_stats.copy()
-            fund_stats_export['年率リターン'] = (fund_stats_export['年率リターン'] * 100).round(2)
-            fund_stats_export['年率ボラ']     = (fund_stats_export['年率ボラ']     * 100).round(2)
-            fund_stats_export['最大DD']       = (fund_stats_export['最大DD']       * 100).round(2)
-            # UIラベルに合わせて列名を変更
-            fund_stats_export = fund_stats_export.rename(columns={
-                '年率リターン': '年平均リターン(%)',
-                '年率ボラ':     '年率価格変動リスク(%)',
-                '最大DD':       '最大DD(%)',
-            })
-            fund_stats_export.to_excel(writer, sheet_name='ファンド統計')
+        # ── ファンド統計シート ────────────────────────────────
+        fund_stats_export = fund_stats.copy()
+        fund_stats_export['年率リターン'] = (fund_stats_export['年率リターン'] * 100).round(2)
+        fund_stats_export['年率ボラ']     = (fund_stats_export['年率ボラ']     * 100).round(2)
+        fund_stats_export['最大DD']       = (fund_stats_export['最大DD']       * 100).round(2)
+        # UIラベルに合わせて列名を変更
+        fund_stats_export = fund_stats_export.rename(columns={
+            '年率リターン': '年平均リターン(%)',
+            '年率ボラ':     '年率価格変動リスク(%)',
+            '最大DD':       '最大DD(%)',
+        })
+        fund_stats_export.to_excel(writer, sheet_name='ファンド統計')
 
-        output.seek(0)
+    output.seek(0)
 
-        st.download_button(
-            label="📥 ダウンロード",
-            data=output,
-            file_name=f"portfolio_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+    st.download_button(
+        label="📥 Excelファイルをダウンロード",
+        data=output,
+        file_name=f"portfolio_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
