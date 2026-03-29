@@ -362,7 +362,7 @@ def _render_client_view(
     </script>
     </body>
     </html>"""
-    _components.html(_client_html, height=1280, scrolling=False)
+    _components.html(_client_html, height=1100, scrolling=False)
 
 
 
@@ -1588,7 +1588,7 @@ body{{background:#F4F6F9;color:#1A2540;font-family:'Noto Sans JP',sans-serif;fon
 </body>
 </html>"""
 
-    _components.html(_html, height=1150, scrolling=False)
+    _components.html(_html, height=1020, scrolling=False)
 
 
 def render_fund_drill_section(
