@@ -40,8 +40,22 @@ import streamlit as st
 # 通貨ペア列として除外するキーワード一覧。
 # portfolio_app.py・test_app.py の両方からここを参照することで、
 # 将来の変更箇所を 1 か所に集約する（M-2 修正）。
+#
+# [FIX-LOW-Ph1-1] カバレッジを拡充。
+# 旧実装は 5 通貨ペアのみで、CAD-JPY / NZD-JPY 等が将来データに含まれると
+# 通貨列が誤って分析対象に混入するリスクがあった。
+# 主要通貨ペアを網羅的に追加し、「-JPY」サフィックスのパターンをコメントに記録する。
+# さらに USD/JPY（スラッシュ区切り）形式も追加して表記揺れに対応する。
+# 将来さらに別形式が増える場合は「'-JPY' in col or '/JPY' in col」のような
+# サフィックスマッチへの一括変更を検討すること。
 CURRENCY_KEYWORDS: list = [
+    # 主要通貨 vs JPY（ハイフン区切り）
     'USD-JPY', 'EUR-JPY', 'GBP-JPY', 'CHF-JPY', 'AUD-JPY',
+    'CAD-JPY', 'NZD-JPY', 'CNY-JPY', 'CNH-JPY', 'SGD-JPY',
+    'HKD-JPY', 'NOK-JPY', 'SEK-JPY', 'DKK-JPY', 'MXN-JPY',
+    # スラッシュ区切り表記（USD/JPY 形式）
+    'USD/JPY', 'EUR/JPY', 'GBP/JPY', 'CHF/JPY', 'AUD/JPY',
+    'CAD/JPY', 'NZD/JPY',
 ]
 
 
@@ -68,6 +82,17 @@ def load_fund_data(file, file_id: str) -> pd.DataFrame:  # noqa: ARG001（file_i
     ファイル名+サイズを文字列化した file_id でキャッシュを確実に無効化する。
     """
     df = pd.read_excel(file)
+    # [FIX-MEDIUM-Ph1-1] "Date" 列の存在チェックを追加。
+    # 列名が "date" / "DATE" / "日付" 等の場合に KeyError でクラッシュする問題を防ぎ、
+    # ユーザーへの分かりやすいエラーメッセージを表示する。
+    if "Date" not in df.columns:
+        _candidates = [c for c in df.columns if str(c).lower() in ("date", "日付", "年月日", "month")]
+        _hint = f"（候補: {_candidates}）" if _candidates else ""
+        st.error(
+            f"アップロードされたファイルに 'Date' 列が見つかりません{_hint}。\n"
+            "先頭列の列名を 'Date' に変更して再アップロードしてください。"
+        )
+        st.stop()
     df["Date"] = pd.to_datetime(df["Date"])
     df = df.set_index("Date").sort_index()
     return df
@@ -197,9 +222,12 @@ def compute_fund_overview_table(
         annual_return_arith = ret.mean() * 12
         # [ISSUE-1修正] 閾値を 1e-6 → 1e-8 に変更し portfolio_utils と統一。
         # ~1e-17 の浮動小数点誤差ゼロでも天文学的シャープを防ぐ。
+        # [FIX-NAN 追加適用] None → np.nan に変更。
+        # cagr() と同様に None が混入すると DataFrame 列が object dtype に昇格し、
+        # prep_overview_df の ×100 処理・st.dataframe のソートが暗黙的に失敗する。
         sharpe = (
             (annual_return_arith - rf_rate) / vol
-            if vol > 1e-8 else None
+            if vol > 1e-8 else np.nan
         )
 
         # 最大 DD：先頭に 1.0 を付加して期初損失を正確に捕捉
@@ -214,17 +242,19 @@ def compute_fund_overview_table(
 
         # ── コアファンドとの相関 ────────────────────────────────
         # 設定来相関
+        # [FIX-NAN 追加適用] None → np.nan に変更（dtype=float を維持するため）
         idx_full   = ret.index.intersection(core_ret_full.index)
         corr_full  = (
             ret[idx_full].corr(core_ret_full[idx_full])
-            if len(idx_full) >= 12 else None
+            if len(idx_full) >= 12 else np.nan
         )
 
         # 分析期間相関
+        # [FIX-NAN 追加適用] None → np.nan に変更（dtype=float を維持するため）
         idx_period   = ret.index.intersection(core_ret_period.index)
         corr_period  = (
             ret[idx_period].corr(core_ret_period[idx_period])
-            if len(idx_period) >= 6 else None
+            if len(idx_period) >= 6 else np.nan
         )
 
         # 相関安定性：12ヶ月ローリング相関の標準偏差
@@ -241,9 +271,11 @@ def compute_fund_overview_table(
             )
             # [NEW-ISSUE-1修正] dropna() を一度だけ呼び出して変数に保存し二重評価を解消
             _rc_valid = rolling_c.dropna()
-            corr_stability = _rc_valid.std(ddof=0) if len(_rc_valid) >= 2 else None
+            # [FIX-NAN 追加適用] None → np.nan に変更（dtype=float を維持するため）
+            corr_stability = _rc_valid.std(ddof=0) if len(_rc_valid) >= 2 else np.nan
         else:
-            corr_stability = None
+            # [FIX-NAN 追加適用] None → np.nan に変更（dtype=float を維持するため）
+            corr_stability = np.nan
 
         rows.append({
             "ファンド名"                        : fund,
@@ -258,7 +290,13 @@ def compute_fund_overview_table(
             "最大DD(設定来)"                    : max_dd,
             "月次勝率"                           : win_rate,
             "コア相関(設定来)"                   : corr_full,
-            f"コア相関({analysis_months // 12}年)": corr_period,
+            # [FIX-MEDIUM-Ph1-2] analysis_months < 12 の場合 months // 12 = 0 となり
+            # 列名が "コア相関(0年)" という不自然な表示になる問題を修正。
+            # 現在のUIは最短1年（12ヶ月）なので実害は低いが、
+            # 12ヶ月未満なら月数表記にフォールバックして常に意味のある列名にする。
+            (f"コア相関({analysis_months // 12}年)"
+             if analysis_months >= 12
+             else f"コア相関({analysis_months}ヶ月)"): corr_period,
             "相関安定性(σ)"                      : corr_stability,
         })
 
@@ -382,6 +420,12 @@ def style_overview_table(
 
     def row_style(row):
         name = row.name
+        # [FIX-LOW-Ph1-2] #dbeafe (blue-100) / #fef9c3 (yellow-100) はライトモード向けのハードコード色。
+        # Streamlit のダークテーマでは背景が暗くなるため色が見えにくくなる。
+        # pandas Styler は CSS 変数（var(--color-*)）をサポートしないため、
+        # Streamlit 公式のテーマ変数を使った完全なダークモード対応は現状困難。
+        # 将来 Streamlit が Styler での CSS 変数に対応した場合は
+        # var(--color-background-info) / var(--color-background-warning) への変更を検討すること。
         if name == core_fund:
             return ["background-color: #dbeafe; font-weight: bold"] * len(row)
         if selected_funds and name in selected_funds and name != core_fund:
