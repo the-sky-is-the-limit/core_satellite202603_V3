@@ -149,8 +149,8 @@ def build_report_data(
     def _pf_row(name, cps, cpw):
         return {
             "プロファイル":  name,
-            "年率リターン":  round(cps["年率リターン"]      * 100, 2),
-            "年平均リスク":  round(cps["年率ボラティリティ"] * 100, 2),
+            "年平均リターン":  round(cps["年率リターン"]      * 100, 2),
+            "年率価格変動リスク":  round(cps["年率ボラティリティ"] * 100, 2),
             "シャープ":      round(cps["シャープレシオ"],          3),
             "ソルティノ":    round(cps["ソルティノレシオ"],         3),
             "最大DD":        round(cps["最大ドローダウン"]   * 100, 2),
@@ -181,8 +181,8 @@ def build_report_data(
 
     # ── 表示用フォーマット辞書（st.dataframe の column_config で使用）──────
     _comparison_col_cfg = {
-        "年率リターン": st.column_config.NumberColumn("年率リターン(%)", format="%+.2f%%"),
-        "年平均リスク": st.column_config.NumberColumn("年平均リスク(%)", format="%.2f%%"),
+        "年平均リターン": st.column_config.NumberColumn("年平均リターン(%)", format="%+.2f%%"),
+        "年率価格変動リスク": st.column_config.NumberColumn("年率価格変動リスク(%)", format="%.2f%%"),
         "シャープ":     st.column_config.NumberColumn("シャープ",        format="%.3f"),
         "ソルティノ":   st.column_config.NumberColumn("ソルティノ",       format="%.3f"),
         "最大DD":       st.column_config.NumberColumn("最大DD(%)",        format="%.2f%%"),
@@ -288,7 +288,7 @@ def build_report_data(
             f'<span class="core-bar-label">★ コアファンド</span>'
             f'<span class="core-bar-name">{core_fund}</span>'
             f'<span style="color:#dde3ea">|</span>'
-            f'<span class="core-bar-item">年率リターン <b style="color:{"#1e8449" if core_return>=0 else "#c0392b"}">{_ret_sign}{core_return*100:.1f}%</b></span>'
+            f'<span class="core-bar-item">年平均リターン <b style="color:{"#1e8449" if core_return>=0 else "#c0392b"}">{_ret_sign}{core_return*100:.1f}%</b></span>'
             f'<span class="core-bar-item">ボラ <b>{core_volatility*100:.1f}%</b></span>'
             f'<span class="core-bar-item">シャープ <b style="color:{"#1e8449" if core_sharpe>=1 else "#d35400"}">{core_sharpe:.2f}</b></span>'
             f'<span class="core-bar-item">最大DD <b style="color:#c0392b">{core_stats_fs["最大DD"]*100:.1f}%</b></span>'
@@ -388,11 +388,11 @@ def render_report_panel(
 
         # ── 第1文：リターンの位置づけ ──────────────────────────
         if r_ret == 1:
-            sent1 = f"分析期間の年率リターンは{ret_sign}{ret_:.1f}%と、5プロファイル中最高でした。"
+            sent1 = f"分析期間の年平均リターンは{ret_sign}{ret_:.1f}%と、5プロファイル中最高でした。"
         elif r_ret == 5:
-            sent1 = f"分析期間の年率リターンは{ret_sign}{ret_:.1f}%と、5プロファイル中最も低い水準でした。"
+            sent1 = f"分析期間の年平均リターンは{ret_sign}{ret_:.1f}%と、5プロファイル中最も低い水準でした。"
         else:
-            sent1 = f"分析期間の年率リターンは{ret_sign}{ret_:.1f}%（5プロファイル中{_ordinal_jp(r_ret)}水準）でした。"
+            sent1 = f"分析期間の年平均リターンは{ret_sign}{ret_:.1f}%（5プロファイル中{_ordinal_jp(r_ret)}水準）でした。"
 
         # ── 第2文：下落（DD）の事実 ────────────────────────────
         if r_dd == 1:
@@ -498,13 +498,13 @@ def render_report_panel(
                 f'      {donut_}'
                 f'      <div style="text-align:right;">'
                 f'        <div class="profile-card-ret">{ret_sign}{ret_:.1f}%</div>'
-                f'        <div class="profile-card-ret-label">年率リターン（実績）</div>'
+                f'        <div class="profile-card-ret-label">年平均リターン（実績）</div>'
                 f'      </div>'
                 f'    </div>'
                 f'  </div>'
                 f'  <div class="profile-card-body">'
                 f'    <div class="profile-card-row">'
-                f'      <span class="profile-card-row-label">年平均リスク'
+                f'      <span class="profile-card-row-label">年率価格変動リスク'
                 f'        <span class="profile-card-row-label-sub">年間の価格変動幅の目安</span>'
                 f'      </span>'
                 f'      <span class="profile-card-row-val">{vol_:.1f}%</span>'
@@ -629,13 +629,13 @@ def render_report_panel(
                         f'      {_rp_donut}'
                         f'      <div style="text-align:right;">'
                         f'        <div class="profile-card-ret">{_rp_ret_sign}{_rp_ret:.1f}%</div>'
-                        f'        <div class="profile-card-ret-label">年率リターン（実績）</div>'
+                        f'        <div class="profile-card-ret-label">年平均リターン（実績）</div>'
                         f'      </div>'
                         f'    </div>'
                         f'  </div>'
                         f'  <div class="profile-card-body">'
                         f'    <div class="profile-card-row">'
-                        f'      <span class="profile-card-row-label">年平均リスク'
+                        f'      <span class="profile-card-row-label">年率価格変動リスク'
                         f'        <span class="profile-card-row-label-sub">年間の価格変動幅の目安</span>'
                         f'      </span>'
                         f'      <span class="profile-card-row-val">{_rp_vol:.1f}%</span>'
@@ -701,13 +701,13 @@ def render_report_panel(
                         f'      {_tr_donut}'
                         f'      <div style="text-align:right;">'
                         f'        <div class="profile-card-ret">{_tr_ret_sign}{_tr_ret:.1f}%</div>'
-                        f'        <div class="profile-card-ret-label">年率リターン（実績）</div>'
+                        f'        <div class="profile-card-ret-label">年平均リターン（実績）</div>'
                         f'      </div>'
                         f'    </div>'
                         f'  </div>'
                         f'  <div class="profile-card-body">'
                         f'    <div class="profile-card-row">'
-                        f'      <span class="profile-card-row-label">年平均リスク'
+                        f'      <span class="profile-card-row-label">年率価格変動リスク'
                         f'        <span class="profile-card-row-label-sub">年間の価格変動幅の目安</span>'
                         f'      </span>'
                         f'      <span class="profile-card-row-val">{_tr_vol:.1f}%</span>'
@@ -780,8 +780,8 @@ def render_report_panel(
                 st.markdown(f'<div style="font-size:0.90rem;font-weight:700;color:{c_};margin:10px 0 4px;">{pname}</div>', unsafe_allow_html=True)
                 badges_html = (
                     '<div class="metric-badges-wrap">'
-                    + _badge("年率リターン", f"{ret_sign}{ret_:.2f}%", "CAGR", c_)
-                    + _badge("年平均リスク", f"{vol_:.2f}%",           "リスク水準", c_)
+                    + _badge("年平均リターン", f"{ret_sign}{ret_:.2f}%", "複利", c_)
+                    + _badge("年率価格変動リスク", f"{vol_:.2f}%",           "リスク水準", c_)
                     + _badge("シャープ",     f'<span style="color:{sr_color}">{sr_:.3f}</span>', "1.0以上が優秀", c_)
                     + _badge("ソルティノ",   f"{so_:.3f}",              "下方リスク調整", c_)
                     + _badge("最大DD",       f'<span style="color:#c0392b">{dd_:.2f}%</span>', "最悪ケース", c_)
@@ -814,7 +814,7 @@ def render_report_panel(
                 use_container_width=True,
                 hide_index=True,
             )
-            _cmp_caption = "年率リターン・最大DD はCAGRベース。シャープ・ソルティノ・カルマーは高いほど優秀。　コア比率はポートフォリオ内のコアファンド比率。"
+            _cmp_caption = "年平均リターン・最大DD は複利（CAGR）ベース。シャープ・ソルティノ・カルマーは高いほど優秀。　コア比率はポートフォリオ内のコアファンド比率。"
             if _show_rp:
                 _cmp_caption += "　リスクパリティ・テールリスク最小型はサイドバーチェックON時に追加表示される参考プロファイルです。"
             st.caption(_cmp_caption)
@@ -1105,7 +1105,7 @@ def render_report_panel(
                     marker=dict(size=6, color='#dde3ea', symbol='circle'),
                     showlegend=False,
                     hovertext=fund,
-                    hovertemplate='%{hovertext}<br>ボラ: %{x:.1f}%<br>リターン: %{y:.1f}%<extra></extra>'
+                    hovertemplate='%{hovertext}<br>価格変動リスク: %{x:.1f}%<br>年平均リターン: %{y:.1f}%<extra></extra>'
                 ))
 
             # 各ポートフォリオをプロット
@@ -1135,7 +1135,7 @@ def render_report_panel(
                     textfont=dict(size=13, color=meta["color"]),
                     hovertemplate=(
                         f'<b>{pname}</b><br>'
-                        'ボラ: %{x:.1f}%<br>リターン: %{y:.1f}%<extra></extra>'
+                        '価格変動リスク: %{x:.1f}%<br>年平均リターン: %{y:.1f}%<extra></extra>'
                     )
                 ))
 
@@ -1166,7 +1166,7 @@ def render_report_panel(
                         mode='lines',
                         name='有効フロンティア',
                         line=dict(color='#b3904a', width=1.5, dash='dot'),
-                        hovertemplate='有効フロンティア<br>ボラ: %{x:.1f}%<br>リターン(CAGR): %{y:.1f}%<extra></extra>',
+                        hovertemplate='有効フロンティア<br>価格変動リスク: %{x:.1f}%<br>年平均リターン(複利): %{y:.1f}%<extra></extra>',
                         showlegend=True
                     ))
             except Exception:
@@ -1177,8 +1177,8 @@ def render_report_panel(
                 # ※ title=None → "undefined" 表示バグ、font.size=0 → バリデーションエラーのため
                 #    空文字＋pad=0＋top余白ゼロで実質非表示にする
                 title=dict(text="", pad=dict(t=0, b=0)),
-                xaxis_title="年平均リスク（ボラティリティ）%",
-                yaxis_title="年率リターン %",
+                xaxis_title="年率価格変動リスク（ボラティリティ）%",
+                yaxis_title="年平均リターン（複利）%",
                 hovermode='closest',
                 height=400,
                 plot_bgcolor='#fafbfc',
@@ -1254,8 +1254,8 @@ def render_export_section(
 
             # ── ポートフォリオ比較シート ──────────────────────────
             _comp_export = comparison_df.rename(columns={
-                "年率リターン": "年率リターン(%)",
-                "年平均リスク": "年平均リスク(%)",
+                "年平均リターン": "年平均リターン(%)",
+                "年率価格変動リスク": "年率価格変動リスク(%)",
                 "最大DD":       "最大DD(%)",
                 "コア比率":     "コア比率(%)",
                 "ファンド数":   "ファンド数(本)",
@@ -1293,8 +1293,8 @@ def render_export_section(
                     _rows.append({
                         'ファンド':       fund,
                         '比重(%)':        _w_pct,
-                        '年率リターン(%)': _ret,
-                        '年平均リスク(%)': _vol,
+                        '年平均リターン(%)': _ret,
+                        '年率価格変動リスク(%)': _vol,
                         'シャープ':        _sr,
                         '最大DD(%)':       _mdd,
                     })
@@ -1313,8 +1313,8 @@ def render_export_section(
                     # [P3修正] '100%'（文字列）→ 100.0（float）に統一。
                     # 文字列混在で列 dtype が object になり Excel での数値ソート・集計が不可になる問題を解消。
                     '比重(%)':        100.0,
-                    '年率リターン(%)': _port_ret,
-                    '年平均リスク(%)': _port_vol,
+                    '年平均リターン(%)': _port_ret,
+                    '年率価格変動リスク(%)': _port_vol,
                     'シャープ':        _port_sr,
                     '最大DD(%)':       _port_mdd,
                 }])
@@ -1330,6 +1330,12 @@ def render_export_section(
             fund_stats_export['年率リターン'] = (fund_stats_export['年率リターン'] * 100).round(2)
             fund_stats_export['年率ボラ']     = (fund_stats_export['年率ボラ']     * 100).round(2)
             fund_stats_export['最大DD']       = (fund_stats_export['最大DD']       * 100).round(2)
+            # UIラベルに合わせて列名を変更
+            fund_stats_export = fund_stats_export.rename(columns={
+                '年率リターン': '年平均リターン(%)',
+                '年率ボラ':     '年率価格変動リスク(%)',
+                '最大DD':       '最大DD(%)',
+            })
             fund_stats_export.to_excel(writer, sheet_name='ファンド統計')
 
         output.seek(0)
