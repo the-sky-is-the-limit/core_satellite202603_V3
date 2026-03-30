@@ -793,8 +793,13 @@ if uploaded_file is not None:
         
         with col2:
             st.markdown(f'<div {_lbl}><span>■</span> 比較ベンチマーク</div>', unsafe_allow_html=True)
-            benchmark_options = ["なし"] + fund_cols
-            default_benchmark = "世界株" if "世界株" in fund_cols else "なし"
+            # [FIX-REVIEW-5] ベンチマーク選択肢を欠損率 < 20% のファンドに限定。
+            # 旧実装は fund_cols（全ファンド）を選択肢にしていたため、
+            # 欠損率 80% のファンドもベンチマークに選択可能だった。
+            # ベンチマーク期間がポートフォリオ期間と大きく乖離すると比較の意味が薄れるため、
+            # コアファンド選択肢（sorted_funds）と同一基準でフィルタする。
+            benchmark_options = ["なし"] + sorted_funds
+            default_benchmark = "世界株" if "世界株" in sorted_funds else "なし"
             default_index = benchmark_options.index(default_benchmark)
             benchmark_param = st.selectbox(
                 "比較ベンチマーク", benchmark_options, index=default_index, label_visibility="collapsed"
@@ -1137,6 +1142,15 @@ if uploaded_file is not None:
             valid_funds = [core_fund] + [
                 f for f in missing_rates[missing_rates == 0].index if f != core_fund
             ]
+            # [FIX-REVIEW-6] コアファンドのデータ不足で分析期間が短縮される場合に明示警告。
+            # dropna() で NaN 行が除去されるため、実効分析期間が選択期間より短くなる。
+            _core_missing = missing_rates.get(core_fund, 0)
+            _core_valid_months = int(len(_df_core) * (1 - _core_missing))
+            st.warning(
+                f"⚠️ コアファンド「{core_fund}」は選択期間内に欠損データがあります"
+                f"（欠損率: {_core_missing:.1%}）。"
+                f"実効分析期間は約 {_core_valid_months} ヶ月に短縮されます。"
+            )
 
         df_returns = _df_core[valid_funds]   # コア期間でアンカー済み・NaN列排除済み
 
