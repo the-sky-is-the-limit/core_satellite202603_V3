@@ -970,6 +970,18 @@ class PortfolioAnalyzer:
                     for i in _adjustable:
                         if slacks[i] > 0:
                             w[i] -= min(-_delta2 * (slacks[i] / total_sl), slacks[i])
+
+        # [FIX-REVIEW-4] 最終 sum=1 チェック（_project_to_feasible_simplex と堅牢性を統一）
+        # CVXPY ソルバー精度が高いため通常は到達しないが、
+        # headroom/slack が不足した極限ケースでの安全弁として追加。
+        _total_final = w.sum()
+        if abs(_total_final - 1.0) > 1e-6 and _total_final > 0:
+            w = w / _total_final
+            warnings.warn(
+                f"_cvxpy_clip_and_normalize: final sum={_total_final:.8f}, "
+                f"applied proportional rescaling.",
+                RuntimeWarning, stacklevel=2,
+            )
         return w
 
     def _optimize_cvxpy(
@@ -1745,7 +1757,15 @@ class PortfolioAnalyzer:
                 best_2nd.x, active, core_fund_idx,
                 core_weight_range, min_individual, max_individual
             )
-        return w1
+        # [FIX-REVIEW-1] 二次最適化が全失敗した場合でも射影を通して返す。
+        # w1 は一次最適化の生ウェイト（bounds 下限なし）のため、
+        # min_individual 未満のアクティブ銘柄が含まれる可能性がある。
+        # CVXPY パスの同等箇所（L1127-1128）も射影を通しており、
+        # SLSQP パスも同様に制約保証を適用する。
+        return self._project_to_feasible_simplex(
+            w1, active, core_fund_idx,
+            core_weight_range, min_individual, max_individual
+        )
 
 
 class FundScreener:
@@ -2691,71 +2711,9 @@ def calculate_fund_metrics(
     }
 
 
-def export_results_to_excel(portfolios: Dict, 
-                            fund_stats: pd.DataFrame,
-                            selected_funds: List[str],
-                            output_path: str):
-    """
-    分析結果をExcelにエクスポート
-
-    .. deprecated::
-        v2.0.1以降、Excelエクスポートは portfolio_report.render_export_section()
-        が担っており、本関数はアプリ内から呼び出されていません。
-        外部スクリプトからの利用互換性のために残していますが、
-        将来のバージョンで削除される可能性があります。
-    
-    Parameters:
-    -----------
-    portfolios : Dict
-        ポートフォリオ辞書
-    fund_stats : pd.DataFrame
-        ファンド統計
-    selected_funds : List[str]
-        選定ファンドリスト
-    output_path : str
-        出力ファイルパス
-    """
-    with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
-        # シート1: ポートフォリオ比較
-        comparison_data = []
-        for profile_name, portfolio in portfolios.items():
-            weights = portfolio['weights']
-            stats = portfolio.get('stats', {})
-            
-            comparison_data.append({
-                'プロファイル': profile_name,
-                '年率リターン': stats.get('年率リターン', 0) * 100,
-                '年率ボラティリティ': stats.get('年率ボラティリティ', 0) * 100,
-                'シャープレシオ': stats.get('シャープレシオ', 0),
-                '最大ドローダウン': stats.get('最大ドローダウン', 0) * 100,
-                'ソルティノレシオ': stats.get('ソルティノレシオ', 0),
-                'カルマー比率': stats.get('カルマー比率', 0)
-            })
-        
-        comparison_df = pd.DataFrame(comparison_data)
-        comparison_df.to_excel(writer, sheet_name='ポートフォリオ比較', index=False)
-        
-        # シート2: 各ポートフォリオの構成
-        for profile_name, portfolio in portfolios.items():
-            weights = portfolio['weights']
-            weights_df = pd.DataFrame({
-                'ファンド': selected_funds,
-                '比重(%)': weights * 100
-            })
-            weights_df = weights_df[weights_df['比重(%)'] > 0.1].sort_values('比重(%)', ascending=False)
-            
-            # シート名は31文字以内
-            sheet_name = f'{profile_name[:20]}_構成'
-            weights_df.to_excel(writer, sheet_name=sheet_name, index=False)
-        
-        # シート3: ファンド統計
-        fund_stats_export = fund_stats.copy()
-        # パーセント表示
-        for col in ['年率リターン', '年率ボラ', '最大DD']:
-            if col in fund_stats_export.columns:
-                fund_stats_export[col] = fund_stats_export[col] * 100
-        
-        fund_stats_export.to_excel(writer, sheet_name='ファンド統計')
+# [FIX-REVIEW-3] export_results_to_excel() を削除。
+# v2.0.1以降、Excelエクスポートは portfolio_report.render_export_section() が担い、
+# 本関数はアプリ内・テストのいずれからも呼び出されていないデッドコードだった。
 
 
 # [FIX-LOW-Ph2-2] クラス定義完了後にバリデーションを実行（モジュールロード時に1回）。
