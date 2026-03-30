@@ -149,11 +149,15 @@ def test_optimization(returns, core_fund, selected_funds):
         core_idx = selected_funds.index(core_fund)
 
         # バランス型で最適化
+        # [FIX-REVIEW-7] min_individual を 0.025 に設定。
+        # 20本選定時にデフォルト 0.03 では下限可行性違反が発生する
+        # (0.5 + 19*0.03 = 1.07 > 1.0)。0.025 なら 0.5 + 19*0.025 = 0.975。
         weights = analyzer.optimize_portfolio(
             core_idx,
             core_weight_range=(0.5, 0.6),
             objective_type='sharpe',
-            max_individual=0.15
+            max_individual=0.15,
+            min_individual=0.025,
         )
 
         print("✓ 最適化成功")
@@ -285,7 +289,8 @@ def test_improvements(returns, core_fund, selected_funds):
             core_weight_range=(0.70, 0.85),
             objective_type='min_cvar',
             max_individual=0.12,
-            min_individual=0.02,
+            # [FIX-REVIEW-7] 20本選定で 0.7+19*0.02=1.08>1.0 のため 0.015 に調整
+            min_individual=0.015,
         )
         stats_cvar = analyzer.calculate_portfolio_stats(w_cvar)
 
@@ -302,7 +307,7 @@ def test_improvements(returns, core_fund, selected_funds):
             core_weight_range=(0.70, 0.85),
             objective_type='sharpe',
             max_individual=0.12,
-            min_individual=0.02,
+            min_individual=0.015,
         )
         stats_sharpe = analyzer.calculate_portfolio_stats(w_sharpe)
 
@@ -330,12 +335,14 @@ def test_improvements(returns, core_fund, selected_funds):
         t0 = time.perf_counter()
         w1 = analyzer.optimize_portfolio(
             core_idx, core_weight_range=(0.5, 0.6),
-            objective_type='sharpe', max_individual=0.15, n_restarts=8
+            objective_type='sharpe', max_individual=0.15,
+            min_individual=0.025, n_restarts=8,  # [FIX-REVIEW-7] 可行性違反回避
         )
         t1 = time.perf_counter()
         w2 = analyzer.optimize_portfolio(
             core_idx, core_weight_range=(0.5, 0.6),
-            objective_type='sharpe', max_individual=0.15, n_restarts=8
+            objective_type='sharpe', max_individual=0.15,
+            min_individual=0.025, n_restarts=8,  # [FIX-REVIEW-7] 可行性違反回避
         )
         t2 = time.perf_counter()
 
