@@ -432,7 +432,14 @@ class PortfolioAnalyzer:
         # 年率リターン（幾何平均CAGR - 表示用）
         cum_return = (1 + port_returns).prod() - 1
         n_periods = len(port_returns)
-        port_return_geom = (1 + cum_return) ** (self.periods_per_year / n_periods) - 1 if n_periods > 0 else 0
+        # [FIX-Ph1-REVIEW] base ≤ 0（累積損失100%超）は CAGR 未定義（複素数になる）→ 0.0 で補完。
+        # __init__（L338-341）/ _calculate_statistics（L889-890）/
+        # calculate_fund_metrics（L2648-2649）と同一のガードを追加し、3パスを完全統一。
+        _base = 1.0 + cum_return
+        port_return_geom = (
+            _base ** (self.periods_per_year / n_periods) - 1
+            if n_periods > 0 and _base > 0 else 0.0
+        )
         
         # 年率ボラティリティ（共分散ベース - 最適化と整合）
         try:
@@ -2315,7 +2322,13 @@ class FundScreener:
             diff = target_total - sum(quota.values())
             if diff != 0:
                 largest = max(quota, key=quota.get)
-                quota[largest] += diff
+                # [FIX-Ph2-REVIEW] 負クォータ防止ガード。
+                # n_final ≤ 5 では max(1, round(v*scale)) で全バケットが最低1になり、
+                # 合計がtarget_totalを超過する。端数調整で最大バケットから減算すると
+                # 0 以下になる場合がある。nlargest(負値) は空を返すため例外は出ないが、
+                # 意図しない動作を防ぐためクランプする。
+                # 現在のUI（スライダー min=20）では到達しないが、ライブラリ直接呼び出し時の安全策。
+                quota[largest] = max(0, quota[largest] + diff)
 
         # ── 3. バケット内スコアリング準備（正規化関数・クラスタリング関数の定義）────
         # ステップ4のループ内で使用する _normalize / _cluster_and_select を先行定義する。
